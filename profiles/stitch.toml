@@ -1,0 +1,31 @@
+# Stitch (includes ExiPay — acquired company, uses GitLab for legacy repos)
+[profile]
+name = "stitch"
+priority = 10
+
+[identity]
+name = "Yashiel Sookdeo"
+email = "yashiel.sookdeo@stitch.money"
+git_user = "yashiels"
+
+[linear]
+api_key_env = "LINEAR_API_KEY"
+org = "Stitch"
+default_team = "Card - Switch"
+teams = ["Card - Switch", "SIP - Switch", "SIP - POS", "SIP - Nexus"]
+
+[platforms.github]
+orgs = ["stitch-Money", "exipay"]
+
+[platforms.gitlab]
+orgs = ["exipay"]
+
+[reviewers.github]
+"stitch-Money/*" = ["damgene", "jeremy-stitch", "shivekiyer"]
+
+[reviewers.gitlab]
+"pos/exi-terminal-*" = ["talha535", "pratham.patel", "christopher.cann", "michal.krauze-wultanski"]
+"*" = ["michael.willans", "shivekiyer", "jamesmaina"]
+
+[detect]
+remote_patterns = ["stitch", "exipay"]

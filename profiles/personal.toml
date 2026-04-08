@@ -1,0 +1,24 @@
+# Personal — Skyner, Nexion, personal repos
+[profile]
+name = "personal"
+priority = 5
+
+[identity]
+name = "Yashiel Sookdeo"
+email = "yashiel@skyner.co.za"
+git_user = "yashiels"
+
+[linear]
+api_key_env = "SKYNER_LINEAR_API_KEY"
+org = "Skyner"
+default_team = "Development"
+teams = ["Development"]
+
+[platforms.github]
+orgs = ["yashiels", "skynergroup"]
+
+[reviewers.github]
+"*" = ["mphocodes"]
+
+[detect]
+remote_patterns = ["skyner", "yashiels", "nexion"]

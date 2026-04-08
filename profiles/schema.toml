@@ -1,0 +1,33 @@
+# Houston Profile Schema
+# Each profile defines a complete development context.
+# Fields marked [required] must be present; others are optional.
+
+[profile]
+name = ""           # [required] Unique profile identifier
+priority = 0        # [required] Higher wins on ambiguous detection
+
+[identity]
+name = ""           # [required] Git author name
+email = ""          # [required] Git author email
+git_user = ""       # [required] GitHub/GitLab username
+
+[linear]
+api_key_env = ""    # [required] Env var name containing Linear API key
+org = ""            # [required] Linear organization name
+default_team = ""   # [required] Default Linear team for new tickets
+teams = []          # Teams the user works on (for ticket prefix detection)
+
+[platforms.github]
+orgs = []           # GitHub org names this profile covers
+
+[platforms.gitlab]
+orgs = []           # GitLab org/group names this profile covers
+
+[reviewers.github]
+# "org/repo-pattern" = ["user1", "user2"]
+
+[reviewers.gitlab]
+# "repo-pattern" = ["user1", "user2"]
+
+[detect]
+remote_patterns = [] # [required] Substrings to match in git remote URLs
