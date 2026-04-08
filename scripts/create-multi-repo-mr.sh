@@ -126,8 +126,35 @@ fi
 
 # Build a mapping from repo name to its index in the dependency chain.
 # Repos not found in any chain get index 9999 (treated as independent, sorted last).
-declare -A DEP_ORDER=()
+# Uses parallel indexed arrays instead of associative arrays for bash 3.2 compatibility.
+DEP_ORDER_KEYS=()
+DEP_ORDER_VALS=()
 CHAIN_DESCRIPTION=""
+
+# Helper: look up dep order for a repo name
+_dep_order_get() {
+  local repo="$1"
+  for _i in "${!DEP_ORDER_KEYS[@]}"; do
+    if [[ "${DEP_ORDER_KEYS[$_i]}" == "$repo" ]]; then
+      echo "${DEP_ORDER_VALS[$_i]}"
+      return
+    fi
+  done
+  echo ""
+}
+
+# Helper: set dep order for a repo name
+_dep_order_set() {
+  local repo="$1" val="$2"
+  for _i in "${!DEP_ORDER_KEYS[@]}"; do
+    if [[ "${DEP_ORDER_KEYS[$_i]}" == "$repo" ]]; then
+      DEP_ORDER_VALS[$_i]="$val"
+      return
+    fi
+  done
+  DEP_ORDER_KEYS+=("$repo")
+  DEP_ORDER_VALS+=("$val")
+}
 
 if [[ -f "$DEPS_CONFIG" ]]; then
   # Iterate over all chains and match repos by path_pattern or repo name
@@ -154,7 +181,7 @@ if [[ -f "$DEPS_CONFIG" ]]; then
         fi
 
         if $matched; then
-          DEP_ORDER["${REPOS[$r]}"]=$idx
+          _dep_order_set "${REPOS[$r]}" "$idx"
           if [[ -z "$CHAIN_DESCRIPTION" ]]; then
             CHAIN_DESCRIPTION="$(jq -r ".chains[\"$chain_name\"].description // \"\"" "$DEPS_CONFIG")"
           fi
@@ -166,8 +193,9 @@ fi
 
 # Assign default order for unmatched repos
 for ((r = 0; r < ${#REPOS[@]}; r++)); do
-  if [[ -z "${DEP_ORDER[${REPOS[$r]}]:-}" ]]; then
-    DEP_ORDER["${REPOS[$r]}"]=9999
+  existing="$(_dep_order_get "${REPOS[$r]}")"
+  if [[ -z "$existing" ]]; then
+    _dep_order_set "${REPOS[$r]}" 9999
   fi
 done
 
@@ -182,8 +210,8 @@ for ((i = 0; i < ${#SORTED_INDICES[@]}; i++)); do
   for ((j = i + 1; j < ${#SORTED_INDICES[@]}; j++)); do
     idx_i="${SORTED_INDICES[$i]}"
     idx_j="${SORTED_INDICES[$j]}"
-    order_i="${DEP_ORDER[${REPOS[$idx_i]}]}"
-    order_j="${DEP_ORDER[${REPOS[$idx_j]}]}"
+    order_i="$(_dep_order_get "${REPOS[$idx_i]}")"
+    order_j="$(_dep_order_get "${REPOS[$idx_j]}")"
     if [[ "$order_i" -gt "$order_j" ]]; then
       SORTED_INDICES[$i]="$idx_j"
       SORTED_INDICES[$j]="$idx_i"
@@ -300,7 +328,8 @@ done
 # Build and print dependency chain (only repos in a known chain, in order)
 CHAIN_PARTS=()
 for ((i = 0; i < ${#MR_REPOS[@]}; i++)); do
-  order="${DEP_ORDER[${MR_REPOS[$i]}]:-9999}"
+  order="$(_dep_order_get "${MR_REPOS[$i]}")"
+  order="${order:-9999}"
   if [[ "$order" -lt 9999 ]]; then
     CHAIN_PARTS+=("${MR_REPOS[$i]}")
   fi
