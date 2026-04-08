@@ -123,27 +123,56 @@ if [[ -n "$BULLET2" ]]; then
 fi
 
 # ─── Get reviewers ───
+# Try context.json first (from pipeline run), fall back to detecting profile directly
 
 REVIEWERS=""
+CONTEXT_JSON=""
+
 if [[ -f "$RUN_DIR/context.json" ]]; then
-  REPO_NAME="$(basename "$(pwd)")"
-  if [[ "$PLATFORM" == "github" ]]; then
-    REVIEWERS="$(jq -r --arg repo "$REPO_NAME" '
-      .reviewers.github as $r |
-      ($r | to_entries | map(select(.key != "*" and ($repo | test(.key)))) | .[0].value // []) as $specific |
-      if ($specific | length) > 0 then $specific
-      else ($r["*"] // [])
-      end | join(",")
-    ' "$RUN_DIR/context.json" 2>/dev/null || echo "")"
-  elif [[ "$PLATFORM" == "gitlab" ]]; then
-    REVIEWERS="$(jq -r --arg repo "$REPO_NAME" '
-      .reviewers.gitlab as $r |
-      ($r | to_entries | map(select(.key != "*" and ($repo | test(.key)))) | .[0].value // []) as $specific |
-      if ($specific | length) > 0 then $specific
-      else ($r["*"] // [])
-      end | join(",")
-    ' "$RUN_DIR/context.json" 2>/dev/null || echo "")"
+  CONTEXT_JSON="$RUN_DIR/context.json"
+elif [[ -x "$HOUSTON_DIR/pipeline/detect-context.sh" ]]; then
+  # No context.json — detect profile from current repo
+  DETECT_OUTPUT="$("$HOUSTON_DIR/pipeline/detect-context.sh" "$(pwd)" "$HOUSTON_DIR/profiles" 2>/dev/null)" || true
+  if [[ -n "$DETECT_OUTPUT" ]]; then
+    CONTEXT_JSON="$(mktemp)"
+    echo "$DETECT_OUTPUT" > "$CONTEXT_JSON"
+    CLEANUP_CONTEXT=true
   fi
+fi
+
+if [[ -n "$CONTEXT_JSON" && -f "$CONTEXT_JSON" ]]; then
+  REPO_NAME="$(basename "$(pwd)")"
+  # Get org/repo from remote for matching patterns like "stitch-Money/*"
+  ORG_REPO="$(echo "$REMOTE_URL" | sed 's/.*[:/]//' | sed 's/\.git$//')"
+
+  # Match reviewers: convert glob patterns (e.g. "stitch-Money/*") to regex,
+  # then test against repo name and org/repo path
+  get_reviewers_jq='
+    def glob_to_regex: gsub("\\*"; ".*") | gsub("\\?"; ".");
+    . as $r |
+    ($r | to_entries | map(select(.key != "*")) | map(select(
+      (.key | glob_to_regex) as $pat |
+      ($repo | test($pat)) or ($org_repo | test($pat))
+    )) | .[0].value // []) as $specific |
+    if ($specific | length) > 0 then $specific
+    else ($r["*"] // [])
+    end | join(",")
+  '
+
+  if [[ "$PLATFORM" == "github" ]]; then
+    REVIEWERS="$(jq -r --arg repo "$REPO_NAME" --arg org_repo "$ORG_REPO" \
+      ".reviewers.github as \$r | \$r | $get_reviewers_jq" \
+      "$CONTEXT_JSON" 2>/dev/null || echo "")"
+  elif [[ "$PLATFORM" == "gitlab" ]]; then
+    REVIEWERS="$(jq -r --arg repo "$REPO_NAME" --arg org_repo "$ORG_REPO" \
+      ".reviewers.gitlab as \$r | \$r | $get_reviewers_jq" \
+      "$CONTEXT_JSON" 2>/dev/null || echo "")"
+  fi
+fi
+
+# Clean up temp context file if we created one
+if [[ "${CLEANUP_CONTEXT:-}" == "true" && -f "$CONTEXT_JSON" ]]; then
+  rm -f "$CONTEXT_JSON"
 fi
 
 # ─── Push and create ───
