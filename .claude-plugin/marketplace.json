@@ -1,0 +1,18 @@
+{
+  "name": "yashiels",
+  "owner": {
+    "name": "Yashiel Sookdeo"
+  },
+  "metadata": {
+    "description": "Plugins by Yashiel Sookdeo",
+    "homepage": "https://github.com/yashiels/houston"
+  },
+  "plugins": [
+    {
+      "name": "houston",
+      "version": "1.0.0",
+      "source": ".",
+      "description": "Multi-context autonomous development orchestrator for Claude Code"
+    }
+  ]
+}
