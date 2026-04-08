@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # update.sh — Pull latest houston and sync the Claude Code plugin
 # Usage: ./scripts/update.sh
 set -euo pipefail

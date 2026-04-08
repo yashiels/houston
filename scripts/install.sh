@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # install.sh — Install Houston as a Claude Code plugin
 # Usage: ./scripts/install.sh
 set -euo pipefail

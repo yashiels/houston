@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # release.sh — Bump version and create a release tag
 # Usage: ./scripts/release.sh <minor|major|patch>
 set -euo pipefail

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # create-pr.sh — Create a PR (GitHub) or MR (GitLab) with correct format
 # Usage: ./scripts/create-pr.sh <ticket-id> [--type feat|fix|chore] [--area <area>] [--title <title>] [--bullet1 <text>] [--bullet2 <text>]
 #
@@ -164,7 +164,7 @@ done
 # Check changelog exists if required
 if $CONV_CHANGELOG; then
   if [[ -f "CHANGELOG.md" ]]; then
-    changelog_changed="$(git diff main..HEAD --name-only 2>/dev/null | grep -c 'CHANGELOG.md' || echo "0")"
+    changelog_changed="$(git diff main..HEAD --name-only 2>/dev/null | grep 'CHANGELOG.md' | wc -l | tr -d ' ')"
     if [[ "$changelog_changed" -eq 0 ]]; then
       echo "WARNING: Convention requires CHANGELOG.md entry but it was not modified" >&2
     fi
