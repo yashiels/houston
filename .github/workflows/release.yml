@@ -1,37 +1,77 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
 
 jobs:
   release:
-    name: Create Release
+    name: Release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run tests before release
+      - name: Configure git
         run: |
-          sudo apt-get install -y bats jq
-          git config --global user.email "ci@houston.dev"
-          git config --global user.name "Houston CI"
-          bats tests/
+          git config user.email "yashiel@skyner.co.za"
+          git config user.name "Yashiel Sookdeo"
 
-      - name: Get version from tag
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Install dependencies
+        run: sudo apt-get install -y bats jq
 
-      - name: Create plugin archive
+      - name: Run tests
+        run: bats tests/
+
+      - name: Bump version
+        id: bump
+        run: |
+          CURRENT=$(jq -r '.version' package.json)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+          case "${{ inputs.bump }}" in
+            patch) PATCH=$((PATCH + 1)) ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+          esac
+
+          NEW="${MAJOR}.${MINOR}.${PATCH}"
+          TAG="v${NEW}"
+
+          jq --arg v "$NEW" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          jq --arg v "$NEW" '.version = $v' .claude-plugin/plugin.json > tmp.json && mv tmp.json .claude-plugin/plugin.json
+          jq --arg v "$NEW" '.plugins[0].version = $v' .claude-plugin/marketplace.json > tmp.json && mv tmp.json .claude-plugin/marketplace.json
+
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "previous=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "Bumped: $CURRENT → $NEW (${{ inputs.bump }})"
+
+      - name: Commit and tag
+        run: |
+          git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.version }}"
+          git tag -a "${{ steps.bump.outputs.tag }}" -m "Houston ${{ steps.bump.outputs.tag }}"
+          git push
+          git push --tags
+
+      - name: Create archive
         id: archive
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ steps.bump.outputs.version }}"
           ARCHIVE="houston-${VERSION}.tar.gz"
 
           tar czf "$ARCHIVE" \
@@ -52,44 +92,42 @@ jobs:
             LICENSE
 
           echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
-          echo "Created $ARCHIVE ($(du -h "$ARCHIVE" | cut -f1))"
 
-      - name: Generate changelog
+      - name: Generate release notes
         run: |
           PREV_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
-          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "$GITHUB_REF_NAME" ]; then
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" = "${{ steps.bump.outputs.tag }}" ]; then
             COMMITS=$(git log --oneline -20)
           else
-            COMMITS=$(git log --oneline "${PREV_TAG}..HEAD")
+            COMMITS=$(git log --oneline "${PREV_TAG}..${{ steps.bump.outputs.tag }}")
           fi
 
-          cat > release-notes.md << 'NOTES'
+          cat > release-notes.md << 'EOF'
           ## What's New
-          NOTES
+          EOF
 
           echo "$COMMITS" | sed 's/^/- /' >> release-notes.md
 
-          cat >> release-notes.md << 'NOTES'
+          cat >> release-notes.md << 'EOF'
 
-          ## Installation
+          ## Install / Update
 
-          **Via Claude Code (recommended):**
           ```bash
           claude plugins marketplace add yashiels/houston
           claude plugins install houston@yashiels
           ```
 
-          **Manual:**
+          Or update existing:
           ```bash
-          git clone https://github.com/yashiels/houston.git
-          cd houston
-          ./scripts/install.sh
+          claude plugins marketplace update yashiels
+          claude plugins update houston@yashiels
           ```
-          NOTES
+          EOF
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.bump.outputs.tag }}
+          name: Houston ${{ steps.bump.outputs.tag }}
           body_path: release-notes.md
           files: ${{ steps.archive.outputs.archive }}
-          generate_release_notes: false
