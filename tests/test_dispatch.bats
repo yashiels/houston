@@ -9,7 +9,6 @@ setup() {
   cd "$TEST_REPO"
   git init -q
   git remote add origin git@github.com:stitch-Money/test-service.git
-  git commit --allow-empty -m "init" -q
 }
 
 teardown() {

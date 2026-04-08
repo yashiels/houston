@@ -50,11 +50,6 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Configure git for tests
-        run: |
-          git config --global user.email "ci@houston.dev"
-          git config --global user.name "Houston CI"
-
       - name: Run tests
         run: bats tests/
 

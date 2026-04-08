@@ -94,6 +94,9 @@ Use the current working directory as the repo path unless the user specifies oth
 
 These scripts are called by agents directly — no need to reimplement the logic:
 - `$HOUSTON_DIR/scripts/create-pr.sh <TICKET-ID>` — Creates PR/MR with correct format, reviewers, squash, delete branch, auto-merge
+- `$HOUSTON_DIR/scripts/create-multi-repo-mr.sh <TICKET-ID> --repos <path1> <path2>` — Multi-repo MR creation in dependency order
+- `$HOUSTON_DIR/scripts/check-comments.sh [--pr N]` — Fetch unresolved review comments as JSON
+- `$HOUSTON_DIR/scripts/check-pipeline.sh [--wait]` — Check CI/CD status, optionally wait for completion
 - `$HOUSTON_DIR/pipeline/quality-gate.sh --scope story|phase|final --config <path>` — Runs quality gates
 - `$HOUSTON_DIR/pipeline/detect-project.sh <path>` — Detects tech stack, outputs JSON
 

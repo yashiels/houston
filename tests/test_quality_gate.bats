@@ -29,7 +29,7 @@ EOF
   # Init git repo so anti-pattern scan can work
   cd "$TEST_PROJECT"
   git init -q
-  git commit --allow-empty -m "init" -q
+  git -c user.email="test@test.com" -c user.name="Test" commit --allow-empty -m "init" -q
 }
 
 teardown() {

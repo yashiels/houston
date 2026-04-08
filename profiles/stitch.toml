@@ -24,7 +24,7 @@ orgs = ["exipay"]
 "stitch-Money/*" = ["damgene", "jeremy-stitch", "shivekiyer"]
 
 [reviewers.gitlab]
-"pos/exi-terminal-*" = ["talha535", "pratham.patel", "christopher.cann", "michal.krauze-wultanski"]
+"pos/exi-terminal-*" = ["talha535", "christopher.cann", "michal.krauze-wultanski"]
 "*" = ["michael.willans", "shivekiyer", "jamesmaina"]
 
 [detect]

@@ -18,6 +18,9 @@ Multi-context autonomous development orchestrator. Dispatches development pipeli
 Agents should call these directly instead of reimplementing the logic:
 
 - `$HOUSTON_DIR/scripts/create-pr.sh <TICKET-ID>` — Creates PR (GitHub) or MR (GitLab). Auto-detects platform, loads reviewers from profile, formats title as `type(area): description [TICKET-ID]`, body is 2 bullet points. Enables squash, delete source branch, auto-merge.
+- `$HOUSTON_DIR/scripts/create-multi-repo-mr.sh <TICKET-ID> --repos <path1> <path2> ...` — Creates MRs/PRs across multiple repos in dependency order. Adds "Depends on" comments linking upstream MRs.
+- `$HOUSTON_DIR/scripts/check-comments.sh [--pr <number>]` — Fetches unresolved review comments (filters bots, resolved, praise). Outputs actionable comments as JSON.
+- `$HOUSTON_DIR/scripts/check-pipeline.sh [--branch <name>] [--wait]` — Checks CI/CD status. Outputs job statuses as JSON. `--wait` polls until complete.
 - `$HOUSTON_DIR/pipeline/quality-gate.sh --scope story|phase|final --config <path>` — Runs quality gates. 3 tiers of increasing rigor with baseline diffing.
 - `$HOUSTON_DIR/pipeline/detect-project.sh <path>` — Detects tech stack, outputs JSON with test/build/lint commands.
 - `$HOUSTON_DIR/pipeline/detect-context.sh <path>` — Detects profile from git remote, outputs JSON with identity/reviewers/platform.
