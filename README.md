@@ -31,8 +31,8 @@ Then in any repo:
         │
         ▼
    ┌─────────────┐     ┌──────────────┐
-   │ Detect       │────▶│ Load Profile │ (stitch / personal)
-   │ Context      │     │ + Credentials│
+   │ Detect      │────▶│ Load Profile │ (stitch / personal)
+   │ Context     │     │ + Credentials│
    └─────────────┘     └──────┬───────┘
                                │
         ┌──────────────────────┘
@@ -44,20 +44,20 @@ Then in any repo:
           │
           ▼
    ┌──────────────────────────────────────┐
-   │         Orchestrator (orchestrate.sh) │
-   │                                       │
-   │  init → detect → baseline             │
-   │    → RESEARCH → GRILL                 │
+   │        Orchestrator (orchestrate.sh) │
+   │                                      │
+   │  init → detect → baseline            │
+   │    → RESEARCH → GRILL                │
    │    → [gate] → PLAN → GRILL           │
    │    → [gate] → PRE-FLIGHT             │
-   │    → PHASE-1 → quality-gate           │
-   │    → PHASE-2 → quality-gate           │
-   │    → FINAL-REVIEW → CODE-SIMPLIFY     │
-   │    → PR-CREATE → CI-MONITOR           │
-   │    → LINEAR-UPDATE → complete         │
-   │                                       │
-   │  Each AI stage = disposable Claude    │
-   │  State persisted to disk between      │
+   │    → PHASE-1 → quality-gate          │
+   │    → PHASE-2 → quality-gate          │
+   │    → FINAL-REVIEW → CODE-SIMPLIFY    │
+   │    → PR-CREATE → CI-MONITOR          │
+   │    → LINEAR-UPDATE → complete        │
+   │                                      │
+   │  Each AI stage = disposable Claude   │
+   │  State persisted to disk between     │
    └──────────────────────────────────────┘
 ```
 
