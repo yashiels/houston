@@ -1,0 +1,15 @@
+{
+  "chains": {
+    "exipay-pos": {
+      "description": "ExiPay POS dependency chain",
+      "order": [
+        {"repo": "exi-libs", "path_pattern": "**/exi-libs"},
+        {"repo": "exi-hub", "path_pattern": "**/exi-hub"},
+        {"repo": "exi-admin", "path_pattern": "**/exi-admin"},
+        {"repo": "exi-terminal-shared", "path_pattern": "**/exi-terminal-shared"},
+        {"repo": "exi-terminal-core", "path_pattern": "**/exi-terminal-core"},
+        {"repo": "exi-terminal-ui", "path_pattern": "**/exi-terminal-ui"}
+      ]
+    }
+  }
+}
