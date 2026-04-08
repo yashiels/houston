@@ -16,7 +16,7 @@ setup() {
   # Create an initial commit so branch operations work
   touch "$TEMP_REPO/.gitkeep"
   git -C "$TEMP_REPO" add .gitkeep >/dev/null 2>&1
-  git -C "$TEMP_REPO" commit -m "init" >/dev/null 2>&1
+  git -C "$TEMP_REPO" -c user.email="test@test" -c user.name="test" commit -m "init" >/dev/null 2>&1
 
   # Create run directory and state.json
   mkdir -p "$RUN_DIR"
