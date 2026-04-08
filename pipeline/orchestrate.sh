@@ -507,31 +507,22 @@ execute_mechanical_step() {
       return 0
       ;;
     LINEAR-UPDATE)
+      # Linear auto-updates status when PRs are raised/merged via GitHub/GitLab integration.
+      # We only attach the PR URL as a convenience (if not auto-linked).
       local ticket_id pr_url
       ticket_id="$(json_get '.ticket_id')"
       pr_url="$(json_get '.pr_url')"
 
-      # Source linear.sh for API functions
-      if [[ -f "${SCRIPT_DIR}/linear.sh" ]]; then
+      if [[ -n "$pr_url" && "$pr_url" != "null" && -f "${SCRIPT_DIR}/linear.sh" ]]; then
         source "${SCRIPT_DIR}/linear.sh"
-
-        # Detect which Linear API key to use from context
         local linear_key_env="LINEAR_API_KEY"
         if [[ -f "$RUN_DIR/context.json" ]]; then
           linear_key_env="$(jq -r '.linear.api_key_env // "LINEAR_API_KEY"' "$RUN_DIR/context.json")"
         fi
-
-        # Update status to "In Review"
-        linear_update_status "$ticket_id" "In Review" "$linear_key_env" 2>/dev/null || true
-
-        # Attach PR URL if available
-        if [[ -n "$pr_url" && "$pr_url" != "null" ]]; then
-          linear_attach_url "$ticket_id" "$pr_url" "Pull Request" "$linear_key_env" 2>/dev/null || true
-        fi
-
-        log_step "INFO" "Linear updated: ${ticket_id} → In Review"
+        linear_attach_url "$ticket_id" "$pr_url" "Pull Request" "$linear_key_env" 2>/dev/null || true
+        log_step "INFO" "Attached PR URL to ${ticket_id}"
       else
-        log_step "WARN" "linear.sh not found, skipping Linear update"
+        log_step "INFO" "LINEAR-UPDATE: nothing to do (Linear auto-syncs status)"
       fi
       return 0
       ;;
