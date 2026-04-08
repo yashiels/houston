@@ -11,7 +11,7 @@
     {
       "name": "houston",
       "version": "1.0.0",
-      "source": ".",
+      "source": "./",
       "description": "Multi-context autonomous development orchestrator for Claude Code"
     }
   ]
