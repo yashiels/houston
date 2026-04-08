@@ -1,0 +1,202 @@
+#!/bin/bash
+# create-pr.sh — Create a PR (GitHub) or MR (GitLab) with correct format
+# Usage: ./scripts/create-pr.sh <ticket-id> [--type feat|fix|chore] [--area <area>] [--title <title>] [--bullet1 <text>] [--bullet2 <text>]
+#
+# Auto-detects platform (GitHub/GitLab) from git remote.
+# Loads reviewers from Houston profile context.
+# Enables: squash commits, delete source branch, auto-merge.
+#
+# Title format: type(area): short description [TICKET-ID]
+# Body format: 2 bullet points (CodeRabbit handles the rest)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HOUSTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ─── Parse arguments ───
+
+TICKET_ID=""
+PR_TYPE="feat"
+AREA=""
+TITLE=""
+BULLET1=""
+BULLET2=""
+BRANCH=""
+RUN_DIR=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --type)    PR_TYPE="$2"; shift ;;
+    --area)    AREA="$2"; shift ;;
+    --title)   TITLE="$2"; shift ;;
+    --bullet1) BULLET1="$2"; shift ;;
+    --bullet2) BULLET2="$2"; shift ;;
+    --branch)  BRANCH="$2"; shift ;;
+    --run-dir) RUN_DIR="$2"; shift ;;
+    -*)        echo "Unknown option: $1" >&2; exit 1 ;;
+    *)         TICKET_ID="$1" ;;
+  esac
+  shift
+done
+
+if [[ -z "$TICKET_ID" ]]; then
+  echo "Usage: create-pr.sh <ticket-id> [--type feat|fix|chore] [--area area] [--title title] [--bullet1 text] [--bullet2 text]" >&2
+  exit 1
+fi
+
+# ─── Detect platform ───
+
+REMOTE_URL="$(git remote get-url origin 2>/dev/null || echo "")"
+PLATFORM="unknown"
+CLI=""
+
+if [[ "$REMOTE_URL" == *"github"* ]]; then
+  PLATFORM="github"
+  CLI="gh"
+elif [[ "$REMOTE_URL" == *"gitlab"* ]]; then
+  PLATFORM="gitlab"
+  CLI="glab"
+fi
+
+if [[ "$PLATFORM" == "unknown" ]]; then
+  echo "ERROR: Cannot detect platform from remote: $REMOTE_URL" >&2
+  exit 1
+fi
+
+# ─── Resolve branch ───
+
+if [[ -z "$BRANCH" ]]; then
+  BRANCH="$(git branch --show-current 2>/dev/null)"
+fi
+
+if [[ -z "$BRANCH" || "$BRANCH" =~ ^(main|master|develop)$ ]]; then
+  echo "ERROR: Must be on a feature branch, not '$BRANCH'" >&2
+  exit 1
+fi
+
+# ─── Build title and body from prd.json if available ───
+
+if [[ -z "$RUN_DIR" ]]; then
+  RUN_DIR="$HOME/.houston/runs/$TICKET_ID"
+fi
+
+if [[ -z "$TITLE" && -f "$RUN_DIR/prd.json" ]]; then
+  TITLE="$(jq -r '.title // empty' "$RUN_DIR/prd.json")"
+fi
+if [[ -z "$TITLE" ]]; then
+  TITLE="$TICKET_ID implementation"
+fi
+
+if [[ -z "$AREA" && -f "$RUN_DIR/prd.json" ]]; then
+  # Extract area from first phase name, lowercased
+  AREA="$(jq -r '.phases[0].name // empty' "$RUN_DIR/prd.json" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g' | head -c 25)"
+fi
+if [[ -z "$AREA" ]]; then
+  AREA="$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]')"
+fi
+
+if [[ -z "$BULLET1" && -f "$RUN_DIR/prd.json" ]]; then
+  BULLET1="$(jq -r '.phases[0].description // empty' "$RUN_DIR/prd.json")"
+fi
+if [[ -z "$BULLET1" ]]; then
+  BULLET1="Implemented $TICKET_ID"
+fi
+
+if [[ -z "$BULLET2" && -f "$RUN_DIR/prd.json" ]]; then
+  BULLET2="$(jq -r 'if (.phases | length) > 1 then .phases[1].description else empty end' "$RUN_DIR/prd.json")"
+fi
+
+# Detect type from title keywords
+if echo "$TITLE" | grep -qiE "fix|bug|patch|hotfix"; then
+  PR_TYPE="fix"
+elif echo "$TITLE" | grep -qiE "chore|refactor|cleanup|maintenance|dependency|upgrade"; then
+  PR_TYPE="chore"
+fi
+
+# ─── Format ───
+
+PR_TITLE="${PR_TYPE}(${AREA}): ${TITLE} [${TICKET_ID}]"
+PR_BODY="- ${BULLET1}"
+if [[ -n "$BULLET2" ]]; then
+  PR_BODY="${PR_BODY}
+- ${BULLET2}"
+fi
+
+# ─── Get reviewers ───
+
+REVIEWERS=""
+if [[ -f "$RUN_DIR/context.json" ]]; then
+  REPO_NAME="$(basename "$(pwd)")"
+  if [[ "$PLATFORM" == "github" ]]; then
+    REVIEWERS="$(jq -r --arg repo "$REPO_NAME" '
+      .reviewers.github as $r |
+      ($r | to_entries | map(select(.key != "*" and ($repo | test(.key)))) | .[0].value // []) as $specific |
+      if ($specific | length) > 0 then $specific
+      else ($r["*"] // [])
+      end | join(",")
+    ' "$RUN_DIR/context.json" 2>/dev/null || echo "")"
+  elif [[ "$PLATFORM" == "gitlab" ]]; then
+    REVIEWERS="$(jq -r --arg repo "$REPO_NAME" '
+      .reviewers.gitlab as $r |
+      ($r | to_entries | map(select(.key != "*" and ($repo | test(.key)))) | .[0].value // []) as $specific |
+      if ($specific | length) > 0 then $specific
+      else ($r["*"] // [])
+      end | join(",")
+    ' "$RUN_DIR/context.json" 2>/dev/null || echo "")"
+  fi
+fi
+
+# ─── Push and create ───
+
+echo "Pushing ${BRANCH}..."
+git push -u origin "$BRANCH" 2>&1 || true
+
+echo ""
+echo "Creating PR/MR..."
+echo "  Title:     $PR_TITLE"
+echo "  Reviewers: ${REVIEWERS:-none}"
+echo "  Platform:  $PLATFORM"
+echo ""
+
+PR_URL=""
+
+if [[ "$PLATFORM" == "github" ]]; then
+  GH_ARGS=(pr create --title "$PR_TITLE" --body "$PR_BODY" --head "$BRANCH")
+  if [[ -n "$REVIEWERS" ]]; then
+    GH_ARGS+=(--reviewer "$REVIEWERS")
+  fi
+
+  PR_URL="$(gh "${GH_ARGS[@]}" 2>&1)" || true
+
+  # Enable auto-merge with squash + delete branch
+  if [[ "$PR_URL" == http* ]]; then
+    gh pr merge "$BRANCH" --auto --squash --delete-branch 2>/dev/null || true
+    echo "  Auto-merge: enabled (squash + delete branch)"
+  fi
+
+elif [[ "$PLATFORM" == "gitlab" ]]; then
+  GL_ARGS=(mr create --fill
+    --title "$PR_TITLE"
+    --description "$PR_BODY"
+    --squash-before-merge
+    --remove-source-branch
+    --when-pipeline-succeeds)
+  if [[ -n "$REVIEWERS" ]]; then
+    GL_ARGS+=(--reviewer "$REVIEWERS")
+  fi
+
+  PR_URL="$(glab "${GL_ARGS[@]}" 2>&1)" || true
+fi
+
+echo ""
+if [[ -n "$PR_URL" ]]; then
+  echo "PR/MR created: $PR_URL"
+
+  # Save URL to state if run dir exists
+  if [[ -f "$RUN_DIR/state.json" ]]; then
+    tmp=$(mktemp)
+    jq --arg url "$PR_URL" '.pr_url = $url' "$RUN_DIR/state.json" > "$tmp" && mv "$tmp" "$RUN_DIR/state.json"
+  fi
+else
+  echo "WARNING: PR/MR creation may have failed. Check output above."
+fi

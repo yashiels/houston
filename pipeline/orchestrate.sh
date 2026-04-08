@@ -398,111 +398,29 @@ execute_mechanical_step() {
       return 0
       ;;
     PR-CREATE)
-      local repo_path branch ticket_id platform cli
+      local repo_path ticket_id
       repo_path="$(json_get '.repo_path')"
-      branch="$(json_get '.branch')"
       ticket_id="$(json_get '.ticket_id')"
-      platform="$(json_get '.platform')"
-      cli="$(json_get '.cli')"
 
-      if [[ -z "$repo_path" || -z "$branch" ]]; then
-        log_step "ERROR" "PR-CREATE: missing repo_path or branch"
+      if [[ -z "$repo_path" ]]; then
+        log_step "ERROR" "PR-CREATE: missing repo_path"
         return 1
       fi
 
       cd "$repo_path" 2>/dev/null || { log_step "ERROR" "Cannot cd to $repo_path"; return 1; }
 
-      # Push branch
-      git push -u origin "$branch" 2>&1 || true
-      log_step "INFO" "Pushed branch $branch"
+      # Delegate to create-pr.sh — handles format, reviewers, squash, auto-merge
+      local pr_output
+      pr_output="$("${HOUSTON_DIR}/scripts/create-pr.sh" "$ticket_id" --run-dir "$RUN_DIR" 2>&1)" || true
+      echo "$pr_output" >> "$RUN_DIR/logs/pr-create.log"
+      log_step "INFO" "PR creation output logged to pr-create.log"
 
-      # Build PR title from prd.json or ticket ID
-      local pr_title pr_body pr_type="feat"
-      if [[ -f "$RUN_DIR/prd.json" ]]; then
-        local prd_title prd_desc
-        prd_title="$(jq -r '.title // empty' "$RUN_DIR/prd.json")"
-        prd_desc="$(jq -r '.description // empty' "$RUN_DIR/prd.json")"
-
-        # Detect type from title/description
-        if echo "$prd_title $prd_desc" | grep -qiE "fix|bug|patch|hotfix"; then
-          pr_type="fix"
-        elif echo "$prd_title $prd_desc" | grep -qiE "chore|refactor|cleanup|maintenance"; then
-          pr_type="chore"
-        fi
-
-        # Extract area from the first phase or title (not repo name)
-        local area
-        area="$(jq -r '.phases[0].name // empty' "$RUN_DIR/prd.json" | tr '[:upper:]' '[:lower:]' | head -c 30)"
-        [[ -z "$area" ]] && area="$(echo "$prd_title" | awk '{print tolower($1)}' | head -c 20)"
-
-        pr_title="${pr_type}(${area}): ${prd_title} [${ticket_id}]"
-
-        # Body: 2 bullet points from phases
-        pr_body="$(jq -r '.phases[:2] | .[] | "- " + .description' "$RUN_DIR/prd.json" 2>/dev/null)"
-        [[ -z "$pr_body" ]] && pr_body="- ${prd_desc}"
-      else
-        pr_title="${pr_type}: ${ticket_id} implementation"
-        pr_body="- Implemented ${ticket_id}"
-      fi
-
-      # Get reviewers from context.json
-      local reviewers_csv=""
-      if [[ -f "$RUN_DIR/context.json" ]]; then
-        local repo_name
-        repo_name="$(basename "$repo_path")"
-
-        if [[ "$platform" == "github" ]]; then
-          # Try specific match first, then wildcard
-          reviewers_csv="$(jq -r --arg repo "$repo_name" '
-            .reviewers.github as $r |
-            ($r | to_entries | map(select(.key != "*" and ($repo | test(.key)))) | .[0].value // []) as $specific |
-            if ($specific | length) > 0 then $specific
-            else ($r["*"] // [])
-            end | join(",")
-          ' "$RUN_DIR/context.json" 2>/dev/null)"
-        elif [[ "$platform" == "gitlab" ]]; then
-          reviewers_csv="$(jq -r --arg repo "$repo_name" '
-            .reviewers.gitlab as $r |
-            ($r | to_entries | map(select(.key != "*" and ($repo | test(.key)))) | .[0].value // []) as $specific |
-            if ($specific | length) > 0 then $specific
-            else ($r["*"] // [])
-            end | join(",")
-          ' "$RUN_DIR/context.json" 2>/dev/null)"
-        fi
-      fi
-
-      local pr_url=""
-      if [[ "$platform" == "github" ]]; then
-        # GitHub: gh pr create
-        local gh_args=(pr create --title "$pr_title" --body "$pr_body" --head "$branch")
-        if [[ -n "$reviewers_csv" ]]; then
-          gh_args+=(--reviewer "$reviewers_csv")
-        fi
-        pr_url="$(gh "${gh_args[@]}" 2>&1)" || true
-
-        # Enable auto-merge with squash if PR was created
-        if [[ "$pr_url" == http* ]]; then
-          gh pr merge "$branch" --auto --squash --delete-branch 2>/dev/null || true
-          log_step "INFO" "Enabled auto-merge (squash) + delete branch"
-        fi
-
-      elif [[ "$platform" == "gitlab" ]]; then
-        # GitLab: glab mr create with squash + delete source branch
-        local gl_args=(mr create --fill --title "$pr_title" --description "$pr_body"
-          --squash-before-merge --remove-source-branch)
-        if [[ -n "$reviewers_csv" ]]; then
-          gl_args+=(--reviewer "$reviewers_csv")
-        fi
-        # Enable auto-merge
-        gl_args+=(--when-pipeline-succeeds)
-        pr_url="$(glab "${gl_args[@]}" 2>&1)" || true
-      fi
-
+      # Extract PR URL from output
+      local pr_url
+      pr_url="$(echo "$pr_output" | grep -oE 'https?://[^ ]+' | head -1)"
       if [[ -n "$pr_url" ]]; then
         json_set --arg url "$pr_url" '.pr_url = $url'
         log_step "INFO" "PR created: $pr_url"
-      else
-        log_step "WARN" "PR creation may have failed — check manually"
       fi
       return 0
       ;;
