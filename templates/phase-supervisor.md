@@ -34,7 +34,7 @@ Use the Agent tool to spawn a coder subagent:
 
 ### 3. Verify
 After each story completes:
-- Verify tests pass (run the test command from project.json)
+- Run story-scope quality gate: `$HOUSTON_DIR/pipeline/quality-gate.sh --scope story --config {{RUN_DIR}}/project.json`
 - Check the coder actually committed their work
 - Update progress.txt
 

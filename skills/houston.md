@@ -90,6 +90,13 @@ Default pipeline mode is `supervised`. User can say "autonomous" or "run it auto
 
 Use the current working directory as the repo path unless the user specifies otherwise.
 
+## Key Scripts (for agents in the pipeline)
+
+These scripts are called by agents directly — no need to reimplement the logic:
+- `$HOUSTON_DIR/scripts/create-pr.sh <TICKET-ID>` — Creates PR/MR with correct format, reviewers, squash, delete branch, auto-merge
+- `$HOUSTON_DIR/pipeline/quality-gate.sh --scope story|phase|final --config <path>` — Runs quality gates
+- `$HOUSTON_DIR/pipeline/detect-project.sh <path>` — Detects tech stack, outputs JSON
+
 ## Output After Dispatch
 
 ```

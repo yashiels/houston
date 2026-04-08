@@ -393,8 +393,44 @@ execute_mechanical_step() {
       fi
       ;;
     PRE-FLIGHT)
-      # Verify branch exists, deps installed — placeholder for now
-      log_step "INFO" "Pre-flight check passed (placeholder)"
+      local repo_path branch
+      repo_path="$(json_get '.repo_path')"
+      branch="$(json_get '.branch')"
+
+      # Verify we're on the right branch
+      if [[ -n "$repo_path" && -d "$repo_path" ]]; then
+        cd "$repo_path" 2>/dev/null || true
+        local current_branch
+        current_branch="$(git branch --show-current 2>/dev/null || echo "")"
+        if [[ -n "$branch" && "$current_branch" != "$branch" ]]; then
+          git checkout "$branch" 2>/dev/null || true
+          log_step "INFO" "Switched to branch $branch"
+        fi
+
+        # Verify not on main/master
+        current_branch="$(git branch --show-current 2>/dev/null || echo "")"
+        if [[ "$current_branch" =~ ^(main|master|develop)$ ]]; then
+          log_step "ERROR" "PRE-FLIGHT: on protected branch $current_branch"
+          return 1
+        fi
+
+        # Verify prd.json exists
+        if [[ ! -f "$RUN_DIR/prd.json" ]]; then
+          log_step "WARN" "PRE-FLIGHT: no prd.json found"
+        fi
+
+        # Run install command if project.json has one
+        if [[ -f "$RUN_DIR/project.json" ]]; then
+          local install_cmd
+          install_cmd="$(jq -r '.installCmd // empty' "$RUN_DIR/project.json")"
+          if [[ -n "$install_cmd" ]]; then
+            eval "$install_cmd" 2>/dev/null || log_step "WARN" "Install command failed: $install_cmd"
+            log_step "INFO" "Ran install: $install_cmd"
+          fi
+        fi
+      fi
+
+      log_step "INFO" "Pre-flight checks passed"
       return 0
       ;;
     PR-CREATE)

@@ -14,8 +14,12 @@ You are reviewing a completed phase for ticket {{TICKET_ID}}. Verify quality, te
 
 ## Review Checklist
 
-### 1. Tests Pass
-Run the project's test command. All tests must pass.
+### 1. Quality Gate
+Run the phase-scope quality gate:
+```bash
+$HOUSTON_DIR/pipeline/quality-gate.sh --scope phase --config {{RUN_DIR}}/project.json
+```
+All gates must pass.
 
 ### 2. Acceptance Criteria
 For each story in this phase, verify every acceptance criterion is met by reading the actual code.

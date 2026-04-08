@@ -49,6 +49,10 @@ Re-read `{{RUN_DIR}}/spec.md`. Is every requirement satisfied?
 
 Fix anything you find. Run tests. Commit with `fix({{TICKET_ID}}): <description>`.
 
+## PR Creation
+
+Do NOT create the PR yourself. The orchestrator calls `$HOUSTON_DIR/scripts/create-pr.sh` which handles format, reviewers, squash, delete branch, and auto-merge automatically.
+
 ## Completion
 - `FINAL_REVIEW_COMPLETE` — ready for PR
 - `FINAL_REVIEW_BLOCKED: <reason>` — critical issues that need human attention
