@@ -1,0 +1,11 @@
+[
+  {"pattern": "console\\.log", "message": "Use logger instead of console.log", "severity": "warning", "exclude": ["*.test.*", "*.spec.*"]},
+  {"pattern": ": any[^_]", "message": "Use proper types instead of any", "severity": "warning", "exclude": ["*.test.*"]},
+  {"pattern": "--no-verify", "message": "Never skip git hooks", "severity": "error"},
+  {"pattern": "\\.skip\\(|xdescribe\\(|xit\\(", "message": "No skipped tests in committed code", "severity": "error"},
+  {"pattern": "\\.only\\(|fdescribe\\(|fit\\(", "message": "No .only() in committed code", "severity": "error"},
+  {"pattern": "@ts-ignore|@ts-expect-error", "message": "Fix type errors instead of suppressing", "severity": "warning"},
+  {"pattern": "TODO|FIXME|HACK|XXX", "message": "Resolve TODO/FIXME before merging", "severity": "warning"},
+  {"pattern": "password\\s*=\\s*[\"'][^\"']+[\"']", "message": "Possible hardcoded credential", "severity": "error"},
+  {"pattern": "api[_-]?key\\s*=\\s*[\"'][^\"']+[\"']", "message": "Possible hardcoded API key", "severity": "error"}
+]
