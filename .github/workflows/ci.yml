@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck on all scripts
+        run: |
+          find pipeline scripts hooks -name "*.sh" -type f | while read -r script; do
+            echo "Checking $script..."
+            shellcheck -x -s bash "$script" || EXIT=1
+          done
+          exit ${EXIT:-0}
+
+  syntax:
+    name: Bash Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify all scripts parse
+        run: |
+          find pipeline scripts hooks -name "*.sh" -type f | while read -r script; do
+            echo "Syntax: $script"
+            bash -n "$script" || EXIT=1
+          done
+          exit ${EXIT:-0}
+
+  tests:
+    name: Bats Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats
+        run: |
+          sudo apt-get install -y bats
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Run tests
+        run: bats tests/
+
+  validate-json:
+    name: Validate JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate anti-patterns.json
+        run: jq empty rules/anti-patterns.json
+
+      - name: Validate plugin manifest
+        run: jq empty .claude-plugin/plugin.json
+
+      - name: Validate marketplace manifest
+        run: jq empty .claude-plugin/marketplace.json
+
+      - name: Validate package.json
+        run: jq empty package.json
+
+  validate-profiles:
+    name: Validate Profiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check profiles parse correctly
+        run: |
+          source pipeline/lib/parse-profile.sh
+          for profile in profiles/*.toml; do
+            [ "$(basename "$profile")" = "schema.toml" ] && continue
+            echo "Parsing $profile..."
+            parse_profile "$profile" | jq empty || { echo "FAIL: $profile"; exit 1; }
+          done
+          echo "All profiles valid"
