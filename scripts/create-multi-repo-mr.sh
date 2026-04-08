@@ -280,26 +280,37 @@ for sorted_idx in "${SORTED_INDICES[@]}"; do
   MR_REPOS+=("$repo")
   MR_PLATFORMS+=("$platform")
 
-  # Add dependency comment if there is an upstream MR
+  # Add MR dependency (blocking merge request) if there is an upstream MR
   if [[ -n "$PREV_MR_URL" && "$PREV_MR_URL" != "(failed)" && "$mr_url" != "" ]]; then
-    dep_comment="Depends on: $PREV_MR_URL ($PREV_REPO must be merged first)"
-
     if [[ "$platform" == "gitlab" ]]; then
-      # Extract MR number from GitLab URL (last path segment)
       mr_number="$(echo "$mr_url" | grep -oE '[0-9]+$' || echo "")"
-      if [[ -n "$mr_number" ]]; then
-        (cd "$abs_path" && glab mr note "$mr_number" --message "$dep_comment" 2>/dev/null) || \
-          echo "  WARNING: Could not add dependency note to GitLab MR" >&2
+      # Extract project path and MR iid from upstream URL for cross-project ref
+      # URL format: https://gitlab.com/<group>/<subgroup>/<project>/-/merge_requests/<iid>
+      prev_mr_ref="$(echo "$PREV_MR_URL" | sed -E 's|https?://[^/]+/||; s|/-/merge_requests/|!|')"
+      if [[ -n "$mr_number" && -n "$prev_mr_ref" ]]; then
+        # Use GitLab API to set blocking MR dependency
+        # The API requires at least one standard field alongside blocking refs
+        project_id="$(cd "$abs_path" && glab api "projects/:id" 2>/dev/null | jq -r '.id' 2>/dev/null || echo "")"
+        current_title="$(cd "$abs_path" && glab api "projects/$project_id/merge_requests/$mr_number" 2>/dev/null | jq -r '.title' 2>/dev/null || echo "")"
+        if [[ -n "$project_id" && -n "$current_title" ]]; then
+          (cd "$abs_path" && glab api --method PUT "projects/$project_id/merge_requests/$mr_number" \
+            -f "title=$current_title" \
+            -f "blocking_merge_requests_references[]=$prev_mr_ref" 2>/dev/null) > /dev/null 2>&1 || \
+            echo "  WARNING: Could not set MR dependency via API" >&2
+          echo "  MR dependency set -> $PREV_REPO ($prev_mr_ref)"
+        fi
+        # Also add a comment for visibility
+        dep_comment="Depends on: $PREV_MR_URL ($PREV_REPO must be merged first)"
+        (cd "$abs_path" && glab mr note "$mr_number" --message "$dep_comment" 2>/dev/null) || true
       fi
     elif [[ "$platform" == "github" ]]; then
-      # Extract PR number from GitHub URL (last path segment)
       pr_number="$(echo "$mr_url" | grep -oE '[0-9]+$' || echo "")"
       if [[ -n "$pr_number" ]]; then
+        dep_comment="Depends on: $PREV_MR_URL ($PREV_REPO must be merged first)"
         (cd "$abs_path" && gh pr comment "$pr_number" --body "$dep_comment" 2>/dev/null) || \
           echo "  WARNING: Could not add dependency comment to GitHub PR" >&2
       fi
     fi
-    echo "  Dependency note added -> $PREV_REPO"
   fi
 
   # Track previous MR for dependency linking

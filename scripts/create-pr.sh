@@ -80,6 +80,12 @@ fi
 if [[ -z "$TITLE" && -f "$RUN_DIR/prd.json" ]]; then
   TITLE="$(jq -r '.title // empty' "$RUN_DIR/prd.json")"
 fi
+
+# Fallback: derive title from git log
+if [[ -z "$TITLE" ]]; then
+  # Use first commit subject as title hint, strip any existing type prefix
+  TITLE="$(git log main..HEAD --format='%s' --reverse 2>/dev/null | head -1 | sed -E 's/^[a-z]+\([^)]*\): //' | sed -E "s/ *\[${TICKET_ID}\]//" || echo "")"
+fi
 if [[ -z "$TITLE" ]]; then
   TITLE="$TICKET_ID implementation"
 fi
@@ -88,6 +94,11 @@ if [[ -z "$AREA" && -f "$RUN_DIR/prd.json" ]]; then
   # Extract area from first phase name, lowercased
   AREA="$(jq -r '.phases[0].name // empty' "$RUN_DIR/prd.json" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g' | head -c 25)"
 fi
+
+# Fallback: derive area from first commit's conventional commit scope
+if [[ -z "$AREA" ]]; then
+  AREA="$(git log main..HEAD --format='%s' --reverse 2>/dev/null | head -1 | grep -oE '^\w+\(([^)]+)\)' | sed -E 's/^\w+\(//;s/\)//' || echo "")"
+fi
 if [[ -z "$AREA" ]]; then
   AREA="$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]')"
 fi
@@ -95,12 +106,19 @@ fi
 if [[ -z "$BULLET1" && -f "$RUN_DIR/prd.json" ]]; then
   BULLET1="$(jq -r '.phases[0].description // empty' "$RUN_DIR/prd.json")"
 fi
+
+# Fallback: derive bullets from git log
 if [[ -z "$BULLET1" ]]; then
-  BULLET1="Implemented $TICKET_ID"
+  BULLET1="$(git log main..HEAD --format='%s' --reverse 2>/dev/null | head -1 || echo "Implemented $TICKET_ID")"
 fi
 
 if [[ -z "$BULLET2" && -f "$RUN_DIR/prd.json" ]]; then
   BULLET2="$(jq -r 'if (.phases | length) > 1 then .phases[1].description else empty end' "$RUN_DIR/prd.json")"
+fi
+
+# Fallback: second bullet from second commit
+if [[ -z "$BULLET2" ]]; then
+  BULLET2="$(git log main..HEAD --format='%s' --reverse 2>/dev/null | sed -n '2p' || echo "")"
 fi
 
 # Detect type from title keywords
@@ -202,17 +220,32 @@ if [[ "$PLATFORM" == "github" ]]; then
   fi
 
 elif [[ "$PLATFORM" == "gitlab" ]]; then
-  GL_ARGS=(mr create --fill
+  # Get current git username for assignee
+  GL_USERNAME="$(glab api user 2>/dev/null | jq -r '.username // empty' 2>/dev/null || echo "")"
+
+  GL_ARGS=(mr create
     --title "$PR_TITLE"
     --description "$PR_BODY"
     --squash-before-merge
     --remove-source-branch
-    --when-pipeline-succeeds)
+    --yes)
   if [[ -n "$REVIEWERS" ]]; then
     GL_ARGS+=(--reviewer "$REVIEWERS")
   fi
+  if [[ -n "$GL_USERNAME" ]]; then
+    GL_ARGS+=(--assignee "$GL_USERNAME")
+  fi
 
   PR_URL="$(glab "${GL_ARGS[@]}" 2>&1)" || true
+
+  # Enable auto-merge after creation
+  if [[ "$PR_URL" == *"merge_requests"* ]]; then
+    mr_number="$(echo "$PR_URL" | grep -oE '[0-9]+$' || echo "")"
+    if [[ -n "$mr_number" ]]; then
+      glab mr merge "$mr_number" --auto-merge --squash --remove-source-branch --yes 2>/dev/null || true
+      echo "  Auto-merge: enabled (squash + delete branch)"
+    fi
+  fi
 fi
 
 echo ""
