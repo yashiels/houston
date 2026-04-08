@@ -45,24 +45,22 @@ linear_get_issue() {
   local query
   query=$(cat <<GRAPHQL
 query {
-  issueSearch(filter: { identifier: { eq: "$identifier" } }) {
-    nodes {
-      id
-      identifier
-      title
-      description
-      url
-      branchName
-      state { name }
-      parent { id identifier }
-      children {
-        nodes { id identifier title }
-      }
-      relations {
-        nodes {
-          type
-          relatedIssue { id identifier title }
-        }
+  issue(id: "$identifier") {
+    id
+    identifier
+    title
+    description
+    url
+    branchName
+    state { name }
+    parent { id identifier }
+    children {
+      nodes { id identifier title }
+    }
+    relations {
+      nodes {
+        type
+        relatedIssue { id identifier title }
       }
     }
   }
@@ -89,11 +87,9 @@ linear_update_status() {
   local issue_query
   issue_query=$(cat <<GRAPHQL
 query {
-  issueSearch(filter: { identifier: { eq: "$identifier" } }) {
-    nodes {
-      id
-      team { id }
-    }
+  issue(id: "$identifier") {
+    id
+    team { id }
   }
 }
 GRAPHQL
@@ -103,8 +99,8 @@ GRAPHQL
   issue_result=$(linear_api "$issue_query" "$key_env")
 
   local issue_id team_id
-  issue_id=$(echo "$issue_result" | jq -r '.data.issueSearch.nodes[0].id // empty')
-  team_id=$(echo "$issue_result" | jq -r '.data.issueSearch.nodes[0].team.id // empty')
+  issue_id=$(echo "$issue_result" | jq -r '.data.issue.id // empty')
+  team_id=$(echo "$issue_result" | jq -r '.data.issue.team.id // empty')
 
   if [ -z "$issue_id" ] || [ -z "$team_id" ]; then
     echo '{"error":"Issue not found","identifier":"'"$identifier"'"}' >&2
@@ -170,9 +166,7 @@ linear_create_sub_issue() {
   local parent_query
   parent_query=$(cat <<GRAPHQL
 query {
-  issueSearch(filter: { identifier: { eq: "$parent_identifier" } }) {
-    nodes { id }
-  }
+  issue(id: "$parent_identifier") { id }
 }
 GRAPHQL
   )
@@ -181,7 +175,7 @@ GRAPHQL
   parent_result=$(linear_api "$parent_query" "$key_env")
 
   local parent_id
-  parent_id=$(echo "$parent_result" | jq -r '.data.issueSearch.nodes[0].id // empty')
+  parent_id=$(echo "$parent_result" | jq -r '.data.issue.id // empty')
 
   if [ -z "$parent_id" ]; then
     echo '{"error":"Parent issue not found","identifier":"'"$parent_identifier"'"}' >&2
@@ -231,9 +225,7 @@ linear_add_comment() {
   local issue_query
   issue_query=$(cat <<GRAPHQL
 query {
-  issueSearch(filter: { identifier: { eq: "$identifier" } }) {
-    nodes { id }
-  }
+  issue(id: "$identifier") { id }
 }
 GRAPHQL
   )
@@ -242,7 +234,7 @@ GRAPHQL
   issue_result=$(linear_api "$issue_query" "$key_env")
 
   local issue_id
-  issue_id=$(echo "$issue_result" | jq -r '.data.issueSearch.nodes[0].id // empty')
+  issue_id=$(echo "$issue_result" | jq -r '.data.issue.id // empty')
 
   if [ -z "$issue_id" ]; then
     echo '{"error":"Issue not found","identifier":"'"$identifier"'"}' >&2
@@ -287,9 +279,7 @@ linear_attach_url() {
   local issue_query
   issue_query=$(cat <<GRAPHQL
 query {
-  issueSearch(filter: { identifier: { eq: "$identifier" } }) {
-    nodes { id }
-  }
+  issue(id: "$identifier") { id }
 }
 GRAPHQL
   )
@@ -298,7 +288,7 @@ GRAPHQL
   issue_result=$(linear_api "$issue_query" "$key_env")
 
   local issue_id
-  issue_id=$(echo "$issue_result" | jq -r '.data.issueSearch.nodes[0].id // empty')
+  issue_id=$(echo "$issue_result" | jq -r '.data.issue.id // empty')
 
   if [ -z "$issue_id" ]; then
     echo '{"error":"Issue not found","identifier":"'"$identifier"'"}' >&2
@@ -351,9 +341,9 @@ linear_find_ticket() {
     if [ -n "${!key_env:-}" ]; then
       local result
       result=$(linear_get_issue "$identifier" "$key_env")
-      local count
-      count=$(echo "$result" | jq -r '.data.issueSearch.nodes | length' 2>/dev/null)
-      if [ "$count" != "0" ] && [ "$count" != "null" ] && [ -n "$count" ]; then
+      local found
+      found=$(echo "$result" | jq -r '.data.issue.id // empty' 2>/dev/null)
+      if [ -n "$found" ]; then
         echo "$result" | jq --arg key "$key_env" '.matched_key_env = $key'
         return 0
       fi
@@ -376,19 +366,17 @@ linear_get_dependencies() {
   local query
   query=$(cat <<GRAPHQL
 query {
-  issueSearch(filter: { identifier: { eq: "$identifier" } }) {
-    nodes {
-      id
-      identifier
-      relations {
-        nodes {
-          type
-          relatedIssue {
-            id
-            identifier
-            title
-            state { name }
-          }
+  issue(id: "$identifier") {
+    id
+    identifier
+    relations {
+      nodes {
+        type
+        relatedIssue {
+          id
+          identifier
+          title
+          state { name }
         }
       }
     }
@@ -402,7 +390,7 @@ GRAPHQL
 
   # Extract just the relations array, filtering to blocking/blocked-by types
   echo "$result" | jq '
-    .data.issueSearch.nodes[0].relations.nodes
+    .data.issue.relations.nodes
     // []
     | map(select(.type == "blocks" or .type == "blocked_by" or .type == "depends_on" or .type == "is_blocked_by"))
     | map({
