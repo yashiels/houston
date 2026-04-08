@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "houston",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "source": "./",
       "description": "Multi-context autonomous development orchestrator for Claude Code"
     }
