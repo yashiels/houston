@@ -12,6 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source the profile parser
+# shellcheck source=pipeline/lib/parse-profile.sh
 source "${SCRIPT_DIR}/lib/parse-profile.sh"
 
 # --- Arguments ---
@@ -171,7 +172,6 @@ if [[ "${#tied_names[@]}" -gt 1 ]]; then
 fi
 
 WINNING_FILE="${MATCHED_FILES[$best_idx]}"
-WINNING_PROFILE="${MATCHED_PROFILES[$best_idx]}"
 
 # --- Step 5: Detect platform ---
 if [[ "$NORMALIZED" == *github* ]]; then

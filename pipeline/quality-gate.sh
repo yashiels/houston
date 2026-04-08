@@ -95,7 +95,6 @@ load_config() {
     CFG_DOCKER_BUILD_CMD="$(jq -r '.dockerBuildCmd // empty' "$config_file")"
     CFG_DOCKER="$(jq -r '.docker // false' "$config_file")"
     CFG_MONOREPO="$(jq -r '.monorepo // false' "$config_file")"
-    CFG_SKIP_TEST_PATTERN="$(jq -r '.skipTestPattern // empty' "$config_file")"
 }
 
 if [[ -n "$CONFIG_PATH" ]]; then
@@ -188,7 +187,7 @@ scan_anti_patterns() {
     local output=""
     local files=""
 
-    cd "$PROJECT_DIR"
+    cd "$PROJECT_DIR" || exit
 
     # Get file list
     if [[ "$mode" == "changed" ]]; then

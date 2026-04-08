@@ -28,7 +28,6 @@ fi
 HOUSTON_DIR="${HOUSTON_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)}"
 RUN_DIR="${HOME}/.houston/runs/${TICKET_ID}"
 STATE_FILE="${RUN_DIR}/state.json"
-CONTEXT_FILE="${RUN_DIR}/context.json"
 
 # Derive log name: strip extension from template name
 STAGE_NAME="${TEMPLATE_NAME%.*}"

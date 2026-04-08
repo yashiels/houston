@@ -138,7 +138,7 @@ emit_blocked() {
 }
 
 emit_status() {
-  local ticket_id current_step mode steps_completed created_at updated_at
+  local ticket_id current_step mode created_at updated_at
   ticket_id="$(json_get '.ticket_id')"
   current_step="$(json_get '.current_step')"
   mode="$(json_get '.mode')"
@@ -195,7 +195,7 @@ get_next_step() {
     validate-prd)      echo "GRILL-PLAN" ;;
     GRILL-PLAN)        echo "plan-review" ;;
     plan-review)       echo "PRE-FLIGHT" ;;
-    PRE-FLIGHT)        echo "$(get_first_phase)" ;;
+    PRE-FLIGHT)        get_first_phase ;;
     FINAL-REVIEW)      echo "CODE-SIMPLIFY" ;;
     CODE-SIMPLIFY)     echo "PR-CREATE" ;;
     PR-CREATE)         echo "CI-MONITOR" ;;
@@ -455,6 +455,7 @@ execute_mechanical_step() {
       local pr_url
       pr_url="$(echo "$pr_output" | grep -oE 'https?://[^ ]+' | head -1)"
       if [[ -n "$pr_url" ]]; then
+        # shellcheck disable=SC2016
         json_set --arg url "$pr_url" '.pr_url = $url'
         log_step "INFO" "PR created: $pr_url"
       fi
@@ -468,6 +469,7 @@ execute_mechanical_step() {
       pr_url="$(json_get '.pr_url')"
 
       if [[ -n "$pr_url" && "$pr_url" != "null" && -f "${SCRIPT_DIR}/linear.sh" ]]; then
+        # shellcheck source=/dev/null
         source "${SCRIPT_DIR}/linear.sh"
         local linear_key_env="LINEAR_API_KEY"
         if [[ -f "$RUN_DIR/context.json" ]]; then

@@ -19,9 +19,11 @@ fi
 
 if [ -n "$SHELL_RC" ]; then
   if ! grep -q "HOUSTON_DIR" "$SHELL_RC" 2>/dev/null; then
-    echo "" >> "$SHELL_RC"
-    echo "# Houston — autonomous dev orchestrator" >> "$SHELL_RC"
-    echo "export HOUSTON_DIR=\"$HOUSTON_DIR\"" >> "$SHELL_RC"
+    {
+      echo ""
+      echo "# Houston — autonomous dev orchestrator"
+      echo "export HOUSTON_DIR=\"$HOUSTON_DIR\""
+    } >> "$SHELL_RC"
     echo "[+] Added HOUSTON_DIR to $SHELL_RC"
   else
     # Update existing entry if path changed

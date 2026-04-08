@@ -48,14 +48,11 @@ fi
 
 REMOTE_URL="$(git remote get-url origin 2>/dev/null || echo "")"
 PLATFORM="unknown"
-CLI=""
 
 if [[ "$REMOTE_URL" == *"github"* ]]; then
   PLATFORM="github"
-  CLI="gh"
 elif [[ "$REMOTE_URL" == *"gitlab"* ]]; then
   PLATFORM="gitlab"
-  CLI="glab"
 fi
 
 if [[ "$PLATFORM" == "unknown" ]]; then
@@ -147,6 +144,7 @@ if [[ -n "$CONTEXT_JSON" && -f "$CONTEXT_JSON" ]]; then
 
   # Match reviewers: convert glob patterns (e.g. "stitch-Money/*") to regex,
   # then test against repo name and org/repo path
+  # shellcheck disable=SC2016
   get_reviewers_jq='
     def glob_to_regex: gsub("\\*"; ".*") | gsub("\\?"; ".");
     . as $r |
