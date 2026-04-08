@@ -61,7 +61,7 @@ echo "Branch: $BRANCH" >&2
 
 # ─── Bot and praise filters ───
 
-BOT_PATTERNS="coderabbit|dependabot|renovate|github-actions|gitlab-bot|mergify|codecov|sonarqube|snyk|greenkeeper"
+BOT_PATTERNS="coderabbit|dependabot|renovate|github-actions|gitlab-bot|mergify|codecov|sonarqube|sonarcloud|snyk|greenkeeper|_bot_|exipay_bot"
 PRAISE_PATTERNS="^(lgtm|looks good|nice|great|awesome|ship it|:shipit:|:lgtm:|:thumbsup:|\\+1)[[:space:]!.]*$"
 
 is_bot() {
@@ -212,13 +212,19 @@ TOTAL_COMMENTS="$(echo "$RAW_COMMENTS" | jq 'length')"
 
 # ─── Filter comments ───
 
-ACTIONABLE_COMMENTS="$(echo "$RAW_COMMENTS" | jq -c --arg bots "$BOT_PATTERNS" --arg praise "$PRAISE_PATTERNS" '
+SYSTEM_PATTERNS="^(assigned to|unassigned|requested review|added \\d+ commit|changed the description|changed title|marked this merge request|mentioned in|approved this|enabled an automatic|merged)"
+
+ACTIONABLE_COMMENTS="$(echo "$RAW_COMMENTS" | jq -c --arg bots "$BOT_PATTERNS" --arg praise "$PRAISE_PATTERNS" --arg system "$SYSTEM_PATTERNS" '
   [.[] |
     select(.resolved != true) |
     select(.author | test($bots; "i") | not) |
     select(
       (.body | gsub("^\\s+|\\s+$"; "") | ascii_downcase) as $trimmed |
       ($trimmed | test($praise; "i")) | not
+    ) |
+    select(
+      (.body | gsub("^<p>"; "") | gsub("^\\s+"; "")) as $clean |
+      ($clean | test($system; "i")) | not
     )
   ]
 ')"
