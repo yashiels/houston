@@ -27,5 +27,10 @@ orgs = ["exipay"]
 "exi-terminal-*" = ["talha535", "christopher.cann", "michal.krauze-wultanski"]
 "*" = ["michael.willans", "shivekiyer", "jamesmaina"]
 
+[conventions.gitlab.exipay]
+# ExiPay GitLab repos require these before PR/MR creation:
+changelog = true           # Add entry to CHANGELOG.md (keep a changelog format)
+lib_bump_check = true      # If shared libs were modified, bump version and note in MR body
+
 [detect]
 remote_patterns = ["stitch", "exipay"]

@@ -29,5 +29,10 @@ orgs = []           # GitLab org/group names this profile covers
 [reviewers.gitlab]
 # "repo-pattern" = ["user1", "user2"]
 
+[conventions.gitlab.org_name]
+# Per-org conventions enforced before PR/MR creation
+changelog = false       # Require CHANGELOG.md entry (keep a changelog format)
+lib_bump_check = false  # Check if shared libs changed, require version bump + note in MR
+
 [detect]
 remote_patterns = [] # [required] Substrings to match in git remote URLs

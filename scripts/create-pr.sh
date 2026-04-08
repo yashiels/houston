@@ -128,6 +128,57 @@ elif echo "$TITLE" | grep -qiE "chore|refactor|cleanup|maintenance|dependency|up
   PR_TYPE="chore"
 fi
 
+# ─── Convention checks ───
+# Load org-specific conventions from profile
+
+CONV_CHANGELOG=false
+CONV_LIB_BUMP=false
+
+# Detect org from remote URL
+ORG_NAME="$(echo "$REMOTE_URL" | sed -E 's|.*[:/]([^/]+)/[^/]+\.git$|\1|' || echo "")"
+
+# Check if a profile has conventions for this org
+for profile_file in "$HOUSTON_DIR"/profiles/*.toml; do
+  [[ -f "$profile_file" ]] || continue
+  # Simple TOML parsing: check for [conventions.gitlab.<org>] or [conventions.github.<org>]
+  if grep -q "\[conventions\.\(gitlab\|github\)\.$ORG_NAME\]" "$profile_file" 2>/dev/null; then
+    # Read convention flags (simple grep-based TOML parsing)
+    section_found=false
+    while IFS= read -r line; do
+      if [[ "$line" == "[conventions."*"$ORG_NAME]" ]]; then
+        section_found=true
+        continue
+      fi
+      if $section_found; then
+        [[ "$line" == "["* ]] && break  # next section
+        case "$line" in
+          changelog*=*true*)  CONV_CHANGELOG=true ;;
+          lib_bump*=*true*)   CONV_LIB_BUMP=true ;;
+        esac
+      fi
+    done < "$profile_file"
+    break
+  fi
+done
+
+# Check changelog exists if required
+if $CONV_CHANGELOG; then
+  if [[ -f "CHANGELOG.md" ]]; then
+    changelog_changed="$(git diff main..HEAD --name-only 2>/dev/null | grep -c 'CHANGELOG.md' || echo "0")"
+    if [[ "$changelog_changed" -eq 0 ]]; then
+      echo "WARNING: Convention requires CHANGELOG.md entry but it was not modified" >&2
+    fi
+  fi
+fi
+
+# Check lib version bumps if required
+if $CONV_LIB_BUMP; then
+  props_changed="$(git diff main..HEAD --name-only 2>/dev/null | grep 'gradle.properties' || echo "")"
+  if [[ -n "$props_changed" ]]; then
+    echo "  Lib version changes detected in: $props_changed"
+  fi
+fi
+
 # ─── Format ───
 
 PR_TITLE="${PR_TYPE}(${AREA}): ${TITLE} [${TICKET_ID}]"
