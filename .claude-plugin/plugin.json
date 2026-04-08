@@ -1,0 +1,19 @@
+{
+  "name": "houston",
+  "description": "Multi-context autonomous development orchestrator for Claude Code",
+  "version": "1.0.0",
+  "author": {
+    "name": "Yashiel Sookdeo",
+    "email": "yashiel@skyner.co.za"
+  },
+  "homepage": "https://github.com/yashiels/houston",
+  "repository": "https://github.com/yashiels/houston",
+  "license": "MIT",
+  "keywords": [
+    "autonomous-dev",
+    "orchestrator",
+    "pipeline",
+    "linear",
+    "agent-deck"
+  ]
+}
