@@ -169,3 +169,53 @@ make_curl_stub() {
   [ "$count" -eq 2 ]
   rm -rf "$stub_dir"
 }
+
+# ---------------------------------------------------------------------------
+# Mutation functions
+# ---------------------------------------------------------------------------
+
+@test "linear_create_issue fails without API key" {
+  unset LINEAR_API_KEY 2>/dev/null || true
+  run linear_create_issue "team-id" "Test title" "" "" "" "" "" "" "LINEAR_API_KEY"
+  [ "$status" -ne 0 ]
+}
+
+@test "linear_create_issue builds valid payload and returns response" {
+  local stub_dir
+  stub_dir="$(mktemp -d)"
+  make_curl_stub "$stub_dir" '{"data":{"issueCreate":{"success":true,"issue":{"id":"i1","identifier":"DEV-99","title":"Test","url":"https://linear.app/test"}}}}'
+  PATH="$stub_dir:$PATH" LINEAR_API_KEY="test_key" \
+    run linear_create_issue "team-id" "Test title" "" "" "" "" "" "" "LINEAR_API_KEY"
+  [ "$status" -eq 0 ]
+  success="$(echo "$output" | jq -r '.data.issueCreate.success')"
+  [ "$success" = "true" ]
+  rm -rf "$stub_dir"
+}
+
+@test "linear_update_issue fails when issue not found" {
+  local stub_dir
+  stub_dir="$(mktemp -d)"
+  make_curl_stub "$stub_dir" '{"data":{"issue":null}}'
+  PATH="$stub_dir:$PATH" LINEAR_API_KEY="test_key" \
+    run linear_update_issue "DEV-99" "" "" "" "" "" "" "" "LINEAR_API_KEY"
+  [ "$status" -ne 0 ]
+  rm -rf "$stub_dir"
+}
+
+@test "linear_create_project fails without API key" {
+  unset LINEAR_API_KEY 2>/dev/null || true
+  run linear_create_project "team-id" "My Project" "" "backlog" "LINEAR_API_KEY"
+  [ "$status" -ne 0 ]
+}
+
+@test "linear_create_project builds valid payload and returns response" {
+  local stub_dir
+  stub_dir="$(mktemp -d)"
+  make_curl_stub "$stub_dir" '{"data":{"projectCreate":{"success":true,"project":{"id":"p1","name":"My Project","state":"backlog","url":"https://linear.app/test"}}}}'
+  PATH="$stub_dir:$PATH" LINEAR_API_KEY="test_key" \
+    run linear_create_project "team-id" "My Project" "" "backlog" "LINEAR_API_KEY"
+  [ "$status" -eq 0 ]
+  success="$(echo "$output" | jq -r '.data.projectCreate.success')"
+  [ "$success" = "true" ]
+  rm -rf "$stub_dir"
+}

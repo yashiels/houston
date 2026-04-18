@@ -636,7 +636,9 @@ linear_create_issue() {
     }
   }'
 
-  linear_api_with_vars "$query" "{\"input\": $input}" "$key_env"
+  linear_api_with_vars "$query" \
+    "$(jq -n --argjson inp "$input" '{"input": $inp}')" \
+    "$key_env"
 }
 
 # ---------------------------------------------------------------------------
@@ -711,7 +713,9 @@ linear_create_project() {
     }
   }'
 
-  linear_api_with_vars "$query" "{\"input\": $input}" "$key_env"
+  linear_api_with_vars "$query" \
+    "$(jq -n --argjson inp "$input" '{"input": $inp}')" \
+    "$key_env"
 }
 
 # ---------------------------------------------------------------------------
