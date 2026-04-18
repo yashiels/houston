@@ -2,6 +2,7 @@
 [profile]
 name = "apex"
 priority = 6
+type = "agent"
 
 [identity]
 name = "Apex by Skyner"
@@ -14,6 +15,9 @@ org = "Skyner Group"
 default_team = "Development"
 teams = ["Development"]
 
+[owners]
+users = ["yashiels"]
+
 [platforms.github]
 orgs = ["yashiels", "skynergroup"]
 
@@ -21,4 +25,4 @@ orgs = ["yashiels", "skynergroup"]
 "*" = ["mphocodes"]
 
 [detect]
-remote_patterns = ["skyner", "yashiels", "nexion"]
+remote_patterns = []
