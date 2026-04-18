@@ -4,9 +4,11 @@
 #   _load_linear_context [profile_name] [houston_dir]
 # Sets globals: PROFILE_JSON, LINEAR_KEY_ENV, DEFAULT_TEAM
 
+set -euo pipefail
+
 _load_linear_context() {
   local profile_name="${1:-}"
-  local houston_dir="${2:-}"
+  local houston_dir="${2:?_load_linear_context requires houston_dir as second argument}"
 
   # Fall back to HOUSTON_PROFILE env var
   if [[ -z "$profile_name" && -n "${HOUSTON_PROFILE:-}" ]]; then
