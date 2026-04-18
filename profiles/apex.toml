@@ -10,7 +10,7 @@ email = "apex@skyner.co.za"
 git_user = "apex-skyner"
 
 [linear]
-api_key_env = "LINEAR_API_KEY"
+api_key_env = "APEX_LINEAR_API_KEY"
 org = "Skyner Group"
 default_team = "Development"
 teams = ["Development"]

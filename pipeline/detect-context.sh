@@ -67,27 +67,26 @@ normalize_url() {
 
 NORMALIZED="$(normalize_url "$REMOTE_URL")"
 
-# --- Step 3: Scan profile TOML files for matching remote_patterns ---
+# --- Step 3: Scan profile TOML files ---
+# Match by remote_patterns URL substring OR by git identity (email/git_user).
+# Both run in the same pass so priority wins when multiple profiles match.
 declare -a MATCHED_PROFILES=()
 declare -a MATCHED_PRIORITIES=()
 declare -a MATCHED_FILES=()
 
+GIT_EMAIL="$(git -C "$REPO_PATH" config user.email 2>/dev/null || true)"
+GIT_USER_NAME="$(git -C "$REPO_PATH" config user.name 2>/dev/null || true)"
+
 for toml_file in "${PROFILES_DIR}"/*.toml; do
   [[ -f "$toml_file" ]] || continue
+  [[ "$(basename "$toml_file")" == "schema.toml" ]] && continue
 
-  # Skip schema.toml
-  basename_file="$(basename "$toml_file")"
-  [[ "$basename_file" == "schema.toml" ]] && continue
-
-  # Extract profile name
   profile_name=""
   profile_priority=0
 
   while IFS= read -r line; do
-    # Skip comments and blank lines
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
     [[ "$line" =~ ^[[:space:]]*$ ]] && continue
-
     if [[ "$line" =~ ^[[:space:]]*name[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
       profile_name="${BASH_REMATCH[1]}"
     fi
@@ -96,7 +95,7 @@ for toml_file in "${PROFILES_DIR}"/*.toml; do
     fi
   done < <(awk '/^\[profile\]/{found=1; next} /^\[/{found=0} found{print}' "$toml_file")
 
-  # Extract remote_patterns array from [detect] section
+  # --- Match by remote_patterns ---
   patterns_line=""
   while IFS= read -r line; do
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
@@ -107,29 +106,42 @@ for toml_file in "${PROFILES_DIR}"/*.toml; do
     fi
   done < <(awk '/^\[detect\]/{found=1; next} /^\[/{found=0} found{print}' "$toml_file")
 
-  [[ -z "$patterns_line" ]] && continue
+  url_matched=false
+  if [[ -n "$patterns_line" ]]; then
+    raw_array="${patterns_line#*=}"
+    raw_array="${raw_array#"${raw_array%%[!\  ]*}"}"
+    while [[ "$raw_array" =~ \"([^\"]+)\" ]]; do
+      pattern="${BASH_REMATCH[1]}"
+      raw_array="${raw_array#*"${BASH_REMATCH[0]}"}"
+      pattern_lower="$(echo "$pattern" | tr '[:upper:]' '[:lower:]')"
+      if [[ "$NORMALIZED" == *"$pattern_lower"* ]]; then
+        url_matched=true
+        break
+      fi
+    done
+  fi
 
-  # Parse the array: extract values between quotes
-  # e.g., remote_patterns = ["stitch", "exipay"]
-  raw_array="${patterns_line#*=}"
-  raw_array="${raw_array#"${raw_array%%[!\  ]*}"}" # trim leading whitespace
-
-  # Extract each quoted string from the array
-  matched=false
-  while [[ "$raw_array" =~ \"([^\"]+)\" ]]; do
-    pattern="${BASH_REMATCH[1]}"
-    # Remove the matched part so we can find the next one
-    raw_array="${raw_array#*"${BASH_REMATCH[0]}"}"
-
-    # Check if pattern is a substring of the normalized URL (case-insensitive)
-    pattern_lower="$(echo "$pattern" | tr '[:upper:]' '[:lower:]')"
-    if [[ "$NORMALIZED" == *"$pattern_lower"* ]]; then
-      matched=true
-      break
+  # --- Match by git identity (email or git_user) ---
+  identity_matched=false
+  identity_email=""
+  identity_git_user=""
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+    if [[ "$line" =~ ^[[:space:]]*email[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
+      identity_email="${BASH_REMATCH[1]}"
     fi
-  done
+    if [[ "$line" =~ ^[[:space:]]*git_user[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
+      identity_git_user="${BASH_REMATCH[1]}"
+    fi
+  done < <(awk '/^\[identity\]/{found=1; next} /^\[/{found=0} found{print}' "$toml_file")
 
-  if $matched; then
+  if [[ -n "$GIT_EMAIL" && "$identity_email" == "$GIT_EMAIL" ]] || \
+     [[ -n "$GIT_USER_NAME" && "$identity_git_user" == "$GIT_USER_NAME" ]]; then
+    identity_matched=true
+  fi
+
+  if $url_matched || $identity_matched; then
     MATCHED_PROFILES+=("$profile_name")
     MATCHED_PRIORITIES+=("$profile_priority")
     MATCHED_FILES+=("$toml_file")
@@ -140,7 +152,7 @@ done
 match_count="${#MATCHED_PROFILES[@]}"
 
 if [[ "$match_count" -eq 0 ]]; then
-  emit_error 1 "$(printf '{"error": "no_match", "message": "No profile matched the remote URL", "remote": "%s", "normalized": "%s"}' \
+  emit_error 1 "$(printf '{"error": "no_match", "message": "No profile matched the remote URL or git identity", "remote": "%s", "normalized": "%s"}' \
     "$REMOTE_URL" "$NORMALIZED")"
 fi
 

@@ -107,6 +107,7 @@ if [[ -z "$TICKET_ID" ]] && declare -f linear_list_projects &>/dev/null; then
   LINEAR_KEY_ENV="${LINEAR_KEY_ENV:-LINEAR_API_KEY}"
   DEFAULT_TEAM="${DEFAULT_TEAM:-}"
 
+
   if [[ -n "$DEFAULT_TEAM" ]]; then
     TEAM_ID="$(linear_resolve_team_id "$DEFAULT_TEAM" "$LINEAR_KEY_ENV" 2>/dev/null || echo "")"
 
