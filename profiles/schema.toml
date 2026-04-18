@@ -6,7 +6,6 @@
 name = ""           # [required] Unique profile identifier
 priority = 0        # [required] Higher wins on ambiguous detection
 type = ""           # [optional] "agent" or "human" — omit for human profiles
-type = ""           # [optional] "agent" or "human" — omit for human profiles
 
 [identity]
 name = ""           # [required] Git author name
@@ -18,9 +17,6 @@ api_key_env = ""    # [required] Env var name containing Linear API key
 org = ""            # [required] Linear organization name
 default_team = ""   # [required] Default Linear team for new tickets
 teams = []          # Teams the user works on (for ticket prefix detection)
-
-[owners]
-users = []          # [agent profiles only] human git users this agent works under
 
 [platforms.github]
 orgs = []           # GitHub org names this profile covers
