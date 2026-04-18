@@ -257,7 +257,7 @@ echo ""
 PR_URL=""
 
 if [[ "$PLATFORM" == "github" ]]; then
-  GH_ARGS=(pr create --title "$PR_TITLE" --body "$PR_BODY" --head "$BRANCH")
+  GH_ARGS=(pr create --title "$PR_TITLE" --body "$PR_BODY" --head "$BRANCH" --assignee "@me")
   if [[ -n "$REVIEWERS" ]]; then
     GH_ARGS+=(--reviewer "$REVIEWERS")
   fi
