@@ -339,7 +339,7 @@ linear_find_ticket() {
   fi
 
   for key_env in "${keys[@]}"; do
-    if [ -n "${!key_env:-}" ]; then
+    if [ -n "$(printenv "$key_env" 2>/dev/null || true)" ]; then
       local result
       result=$(linear_get_issue "$identifier" "$key_env")
       local found
