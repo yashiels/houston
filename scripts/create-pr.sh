@@ -81,22 +81,75 @@ if [[ -z "$DEFAULT_BRANCH" ]]; then
 fi
 DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
 
+# Source linear.sh early — needed for ticket lookup and attach
+if [[ -f "$HOUSTON_DIR/pipeline/linear.sh" ]]; then
+  # shellcheck source=pipeline/linear.sh
+  source "$HOUSTON_DIR/pipeline/linear.sh" 2>/dev/null || true
+fi
+
 # ─── Resolve ticket ID ───
-# Priority: CLI arg → branch name (PROJ-123 pattern) → error
+# Priority: CLI arg → branch name (PROJ-123 pattern) → Linear project lookup → create
 
 if [[ -z "$TICKET_ID" ]]; then
   TICKET_ID="$(echo "$BRANCH" | grep -oiE '[A-Za-z]+-[0-9]+' | head -1 || echo "")"
 fi
 
-if [[ -z "$TICKET_ID" ]]; then
-  echo "ERROR: No Linear ticket ID found. Pass as first argument or name branch like PROJ-123/description" >&2
-  exit 1
+if [[ -z "$TICKET_ID" ]] && declare -f linear_list_projects &>/dev/null; then
+  REPO_NAME="$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]')"
+
+  # Load profile to get LINEAR_KEY_ENV and DEFAULT_TEAM
+  if [[ -f "$HOUSTON_DIR/pipeline/lib/parse-profile.sh" && -f "$HOUSTON_DIR/pipeline/lib/load-profile.sh" ]]; then
+    source "$HOUSTON_DIR/pipeline/lib/parse-profile.sh" 2>/dev/null || true
+    source "$HOUSTON_DIR/pipeline/lib/load-profile.sh" 2>/dev/null || true
+    _load_linear_context "" "$HOUSTON_DIR" 2>/dev/null || true
+  fi
+
+  LINEAR_KEY_ENV="${LINEAR_KEY_ENV:-LINEAR_API_KEY}"
+  DEFAULT_TEAM="${DEFAULT_TEAM:-}"
+
+  if [[ -n "$DEFAULT_TEAM" ]]; then
+    TEAM_ID="$(linear_resolve_team_id "$DEFAULT_TEAM" "$LINEAR_KEY_ENV" 2>/dev/null || echo "")"
+
+    if [[ -n "$TEAM_ID" ]]; then
+      # Find a project whose name matches the repo name (case-insensitive)
+      PROJECT_ID="$(linear_list_projects "$TEAM_ID" "$LINEAR_KEY_ENV" 2>/dev/null | \
+        jq -r --arg repo "$REPO_NAME" \
+        '.[] | select((.name | ascii_downcase) == $repo or (.name | ascii_downcase | gsub(" "; "-")) == $repo) | .id' | head -1)"
+
+      if [[ -n "$PROJECT_ID" ]]; then
+        # Extract meaningful keywords from branch description (strip prefix and ticket pattern)
+        BRANCH_DESC="$(echo "$BRANCH" | sed -E 's|^[^/]+/||' | sed -E 's/^[a-z]+-[0-9]+-?//')"
+        KEYWORDS="$(echo "$BRANCH_DESC" | tr '-' '\n' | grep -E '^.{3,}$' | tr '\n' '|' | sed 's/|$//')"
+
+        # Search open issues in that project, match title against branch keywords
+        ISSUES_JSON="$(linear_list_issues "$TEAM_ID" "$PROJECT_ID" "" "" "100" "$LINEAR_KEY_ENV" 2>/dev/null || echo "[]")"
+        EXISTING="$(echo "$ISSUES_JSON" | jq -r \
+          --arg kw "$KEYWORDS" \
+          '[.[] | select(.state != "Done" and .state != "Cancelled") |
+            select(.title | ascii_downcase | test($kw | ascii_downcase))] |
+            sort_by(if .state == "In Progress" then 0 elif .state == "Todo" then 1 else 2 end) |
+            .[0].identifier // empty' 2>/dev/null || echo "")"
+
+        if [[ -n "$EXISTING" ]]; then
+          echo "  Found existing ticket: $EXISTING" >&2
+          TICKET_ID="$EXISTING"
+        else
+          # No matching ticket — create one in the project
+          ISSUE_TITLE="$(echo "$BRANCH_DESC" | sed 's/-/ /g')"
+          NEW_ISSUE="$("$HOUSTON_DIR/scripts/linear-create-issue.sh" \
+            --title "$ISSUE_TITLE" \
+            --project "$PROJECT_ID" 2>/dev/null || echo "")"
+          TICKET_ID="$(echo "$NEW_ISSUE" | jq -r '.issue.identifier // empty' 2>/dev/null || echo "")"
+          [[ -n "$TICKET_ID" ]] && echo "  Created ticket: $TICKET_ID" >&2
+        fi
+      fi
+    fi
+  fi
 fi
 
-# Source linear.sh so downstream callers can use linear_attach_url etc.
-if [[ -f "$HOUSTON_DIR/pipeline/linear.sh" ]]; then
-  # shellcheck source=pipeline/linear.sh
-  source "$HOUSTON_DIR/pipeline/linear.sh" 2>/dev/null || true
+if [[ -z "$TICKET_ID" ]]; then
+  echo "ERROR: No Linear ticket ID found and could not resolve one from project. Pass as first argument or name branch like PROJ-123/description" >&2
+  exit 1
 fi
 
 # ─── Build title and body from prd.json if available ───
