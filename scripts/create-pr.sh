@@ -71,6 +71,19 @@ if [[ -z "$BRANCH" || "$BRANCH" =~ ^(main|master|develop)$ ]]; then
   exit 1
 fi
 
+# ─── Detect default branch ───
+
+DEFAULT_BRANCH="$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')"
+if [[ -z "$DEFAULT_BRANCH" ]]; then
+  DEFAULT_BRANCH="$(git remote show origin 2>/dev/null | grep 'HEAD branch' | sed 's/.*: //')"
+fi
+if [[ -z "$DEFAULT_BRANCH" ]]; then
+  for _b in main master develop; do
+    if git rev-parse --verify "$_b" &>/dev/null; then DEFAULT_BRANCH="$_b"; break; fi
+  done
+fi
+DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+
 # ─── Build title and body from prd.json if available ───
 
 if [[ -z "$RUN_DIR" ]]; then
@@ -84,7 +97,7 @@ fi
 # Fallback: derive title from git log
 if [[ -z "$TITLE" ]]; then
   # Use first commit subject as title hint, strip any existing type prefix
-  TITLE="$(git log main..HEAD --format='%s' --reverse 2>/dev/null | head -1 | sed -E 's/^[a-z]+\([^)]*\): //' | sed -E "s/ *\[${TICKET_ID}\]//" || echo "")"
+  TITLE="$(git log $DEFAULT_BRANCH..HEAD --format='%s' --reverse 2>/dev/null | head -1 | sed -E 's/^[a-z]+\([^)]*\): //' | sed -E "s/ *\[${TICKET_ID}\]//" || echo "")"
 fi
 if [[ -z "$TITLE" ]]; then
   TITLE="$TICKET_ID implementation"
@@ -97,7 +110,7 @@ fi
 
 # Fallback: derive area from first commit's conventional commit scope
 if [[ -z "$AREA" ]]; then
-  AREA="$(git log main..HEAD --format='%s' --reverse 2>/dev/null | head -1 | grep -oE '^\w+\(([^)]+)\)' | sed -E 's/^\w+\(//;s/\)//' || echo "")"
+  AREA="$(git log $DEFAULT_BRANCH..HEAD --format='%s' --reverse 2>/dev/null | head -1 | grep -oE '^\w+\(([^)]+)\)' | sed -E 's/^\w+\(//;s/\)//' || echo "")"
 fi
 if [[ -z "$AREA" ]]; then
   AREA="$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]')"
@@ -109,7 +122,7 @@ fi
 
 # Fallback: derive bullets from git log
 if [[ -z "$BULLET1" ]]; then
-  BULLET1="$(git log main..HEAD --format='%s' --reverse 2>/dev/null | head -1 || echo "Implemented $TICKET_ID")"
+  BULLET1="$(git log $DEFAULT_BRANCH..HEAD --format='%s' --reverse 2>/dev/null | head -1 || echo "Implemented $TICKET_ID")"
 fi
 
 if [[ -z "$BULLET2" && -f "$RUN_DIR/prd.json" ]]; then
@@ -118,7 +131,7 @@ fi
 
 # Fallback: second bullet from second commit
 if [[ -z "$BULLET2" ]]; then
-  BULLET2="$(git log main..HEAD --format='%s' --reverse 2>/dev/null | sed -n '2p' || echo "")"
+  BULLET2="$(git log $DEFAULT_BRANCH..HEAD --format='%s' --reverse 2>/dev/null | sed -n '2p' || echo "")"
 fi
 
 # Detect type from title keywords
@@ -164,7 +177,7 @@ done
 # Check changelog exists if required
 if $CONV_CHANGELOG; then
   if [[ -f "CHANGELOG.md" ]]; then
-    changelog_changed="$(git diff main..HEAD --name-only 2>/dev/null | grep 'CHANGELOG.md' | wc -l | tr -d ' ')"
+    changelog_changed="$(git diff $DEFAULT_BRANCH..HEAD --name-only 2>/dev/null | grep 'CHANGELOG.md' | wc -l | tr -d ' ')"
     if [[ "$changelog_changed" -eq 0 ]]; then
       echo "WARNING: Convention requires CHANGELOG.md entry but it was not modified" >&2
     fi
@@ -173,7 +186,7 @@ fi
 
 # Check lib version bumps if required
 if $CONV_LIB_BUMP; then
-  props_changed="$(git diff main..HEAD --name-only 2>/dev/null | grep 'gradle.properties' || echo "")"
+  props_changed="$(git diff $DEFAULT_BRANCH..HEAD --name-only 2>/dev/null | grep 'gradle.properties' || echo "")"
   if [[ -n "$props_changed" ]]; then
     echo "  Lib version changes detected in: $props_changed"
   fi
@@ -264,8 +277,8 @@ if [[ "$PLATFORM" == "github" ]]; then
 
   PR_URL="$(gh "${GH_ARGS[@]}" 2>&1)" || true
 
-  # Enable auto-merge with squash + delete branch
-  if [[ "$PR_URL" == http* ]]; then
+  # Enable auto-merge only when no reviewers — with reviewers, branch protection gates the merge
+  if [[ "$PR_URL" == http* && -z "$REVIEWERS" ]]; then
     gh pr merge "$BRANCH" --auto --squash --delete-branch 2>/dev/null || true
     echo "  Auto-merge: enabled (squash + delete branch)"
   fi
