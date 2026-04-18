@@ -43,7 +43,10 @@ PROJECT_ID=""
 ASSIGNEE_ID=""
 
 if [[ -n "$TEAM" ]]; then
-  TEAM_ID=$(linear_resolve_team_id "$TEAM" "$LINEAR_KEY_ENV") || true
+  TEAM_ID=$(linear_resolve_team_id "$TEAM" "$LINEAR_KEY_ENV") || {
+    echo '{"error":"Team not found: '"$TEAM"'"}' >&2
+    exit 1
+  }
 fi
 
 if [[ -n "$PROJECT_ARG" ]]; then
@@ -55,7 +58,10 @@ if [[ -n "$PROJECT_ARG" ]]; then
 fi
 
 if [[ -n "$ASSIGNEE" ]]; then
-  ASSIGNEE_ID=$(linear_resolve_member_id "$ASSIGNEE" "$LINEAR_KEY_ENV") || true
+  ASSIGNEE_ID=$(linear_resolve_member_id "$ASSIGNEE" "$LINEAR_KEY_ENV") || {
+    echo '{"error":"Assignee not found: '"$ASSIGNEE"'"}' >&2
+    exit 1
+  }
 fi
 
 linear_list_issues "$TEAM_ID" "$PROJECT_ID" "$STATE_FILTER" "$ASSIGNEE_ID" "$LIMIT" "$LINEAR_KEY_ENV"

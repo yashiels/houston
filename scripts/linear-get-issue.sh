@@ -29,6 +29,11 @@ if [[ -z "$ISSUE_ID" ]]; then
   exit 1
 fi
 
+if [[ ! "$ISSUE_ID" =~ ^[A-Z]+-[0-9]+$ ]]; then
+  echo '{"error":"Invalid issue identifier format. Expected e.g. DEV-42"}' >&2
+  exit 1
+fi
+
 _load_linear_context "$PROFILE_OVERRIDE" "$HOUSTON_DIR"
 
 linear_api "{ issue(id: \"$ISSUE_ID\") {
