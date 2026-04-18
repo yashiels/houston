@@ -268,40 +268,6 @@ if [[ -n "$BULLET2" ]]; then
 - ${BULLET2}"
 fi
 
-# Append co-authored-by trailers — included in merge commits by GitHub
-# For agent profiles, credit the owner; otherwise credit the committer
-COAUTHOR_TRAILERS=""
-if declare -f parse_profile &>/dev/null && [[ -f "$HOUSTON_DIR/pipeline/detect-context.sh" ]]; then
-  _ctx="$("$HOUSTON_DIR/pipeline/detect-context.sh" "$(pwd)" "$HOUSTON_DIR/profiles" 2>/dev/null || true)"
-  if [[ -n "$_ctx" ]]; then
-    # Agent profile: look up owner identities from profiles
-    _owner_users="$(echo "$_ctx" | jq -r '.owners.users[]? // empty' 2>/dev/null || true)"
-    for _user in $_owner_users; do
-      _owner_profile="$(find "$HOUSTON_DIR/profiles" -name "*.toml" ! -name "schema.toml" \
-        -exec grep -l "git_user.*=.*\"$_user\"" {} \; 2>/dev/null | head -1)"
-      if [[ -n "$_owner_profile" ]]; then
-        _owner_name="$(parse_profile "$_owner_profile" 2>/dev/null | jq -r '.identity.name // empty')"
-        _owner_email="$(parse_profile "$_owner_profile" 2>/dev/null | jq -r '.identity.email // empty')"
-        [[ -n "$_owner_name" && -n "$_owner_email" ]] && \
-          COAUTHOR_TRAILERS="${COAUTHOR_TRAILERS}Co-authored-by: ${_owner_name} <${_owner_email}>"$'\n'
-      fi
-    done
-    # Also credit the committer if not already included
-    _committer_name="$(echo "$_ctx" | jq -r '.identity.name // empty' 2>/dev/null)"
-    _committer_email="$(echo "$_ctx" | jq -r '.identity.email // empty' 2>/dev/null)"
-    if [[ -n "$_committer_name" && -n "$_committer_email" ]]; then
-      _trailer="Co-authored-by: ${_committer_name} <${_committer_email}>"
-      [[ "$COAUTHOR_TRAILERS" != *"$_committer_email"* ]] && \
-        COAUTHOR_TRAILERS="${COAUTHOR_TRAILERS}${_trailer}"$'\n'
-    fi
-  fi
-fi
-if [[ -n "$COAUTHOR_TRAILERS" ]]; then
-  PR_BODY="${PR_BODY}
-
-${COAUTHOR_TRAILERS%$'\n'}"
-fi
-
 # ─── Get reviewers ───
 # Try context.json first (from pipeline run), fall back to detecting profile directly
 
