@@ -39,10 +39,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ -z "$TICKET_ID" ]]; then
-  echo "Usage: create-pr.sh <ticket-id> [--type feat|fix|chore] [--area area] [--title title] [--bullet1 text] [--bullet2 text]" >&2
-  exit 1
-fi
+# TICKET_ID may be derived from branch name below — defer the empty check
 
 # ─── Detect platform ───
 
@@ -83,6 +80,24 @@ if [[ -z "$DEFAULT_BRANCH" ]]; then
   done
 fi
 DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+
+# ─── Resolve ticket ID ───
+# Priority: CLI arg → branch name (PROJ-123 pattern) → error
+
+if [[ -z "$TICKET_ID" ]]; then
+  TICKET_ID="$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' | head -1 || echo "")"
+fi
+
+if [[ -z "$TICKET_ID" ]]; then
+  echo "ERROR: No Linear ticket ID found. Pass as first argument or name branch like PROJ-123/description" >&2
+  exit 1
+fi
+
+# Source linear.sh so downstream callers can use linear_attach_url etc.
+if [[ -f "$HOUSTON_DIR/pipeline/linear.sh" ]]; then
+  # shellcheck source=pipeline/linear.sh
+  source "$HOUSTON_DIR/pipeline/linear.sh" 2>/dev/null || true
+fi
 
 # ─── Build title and body from prd.json if available ───
 
@@ -324,6 +339,11 @@ if [[ -n "$PR_URL" ]]; then
   if [[ -f "$RUN_DIR/state.json" ]]; then
     tmp=$(mktemp)
     jq --arg url "$PR_URL" '.pr_url = $url' "$RUN_DIR/state.json" > "$tmp" && mv "$tmp" "$RUN_DIR/state.json"
+  fi
+
+  # Attach PR/MR URL to Linear ticket if linear.sh was sourced
+  if declare -f linear_attach_url &>/dev/null; then
+    linear_attach_url "$TICKET_ID" "$PR_URL" "$PR_TITLE" 2>/dev/null || true
   fi
 else
   echo "WARNING: PR/MR creation may have failed. Check output above."
