@@ -19,7 +19,8 @@
 linear_api() {
   local query="$1"
   local key_env="${2:-LINEAR_API_KEY}"
-  local api_key="${!key_env}"
+  local api_key
+  api_key="$(printenv "$key_env" 2>/dev/null || true)"
 
   if [ -z "$api_key" ]; then
     echo '{"error":"No API key found in env var '"$key_env"'"}' >&2
@@ -411,7 +412,8 @@ linear_api_with_vars() {
   local query="$1"
   local vars_json="$2"
   local key_env="${3:-LINEAR_API_KEY}"
-  local api_key="${!key_env}"
+  local api_key
+  api_key="$(printenv "$key_env" 2>/dev/null || true)"
 
   if [ -z "$api_key" ]; then
     echo '{"error":"No API key found in env var '"$key_env"'"}' >&2

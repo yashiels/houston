@@ -85,7 +85,7 @@ DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
 # Priority: CLI arg → branch name (PROJ-123 pattern) → error
 
 if [[ -z "$TICKET_ID" ]]; then
-  TICKET_ID="$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' | head -1 || echo "")"
+  TICKET_ID="$(echo "$BRANCH" | grep -oiE '[A-Za-z]+-[0-9]+' | head -1 || echo "")"
 fi
 
 if [[ -z "$TICKET_ID" ]]; then
