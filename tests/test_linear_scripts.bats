@@ -15,7 +15,7 @@ setup() {
 }
 
 @test "linear-teams.sh fails with no API key for apex profile" {
-  run bash -c "unset LINEAR_API_KEY; $REPO_ROOT/scripts/linear-teams.sh --profile apex 2>&1"
+  run bash -c "unset APEX_LINEAR_API_KEY; $REPO_ROOT/scripts/linear-teams.sh --profile apex 2>&1"
   [ "$status" -ne 0 ]
 }
 

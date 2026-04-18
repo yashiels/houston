@@ -91,7 +91,7 @@ fi
 # Priority: CLI arg → branch name (PROJ-123 pattern) → Linear project lookup → create
 
 if [[ -z "$TICKET_ID" ]]; then
-  TICKET_ID="$(echo "$BRANCH" | grep -oiE '[A-Za-z]+-[0-9]+' | head -1 || echo "")"
+  TICKET_ID="$(echo "$BRANCH" | grep -oiE '[A-Za-z]+-[0-9]+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")"
 fi
 
 if [[ -z "$TICKET_ID" ]] && declare -f linear_list_projects &>/dev/null; then
@@ -135,12 +135,10 @@ if [[ -z "$TICKET_ID" ]] && declare -f linear_list_projects &>/dev/null; then
           echo "  Found existing ticket: $EXISTING" >&2
           TICKET_ID="$EXISTING"
         else
-          # No matching ticket — create one in the project
+          # No matching ticket — create one directly using resolved UUIDs
           ISSUE_TITLE="$(echo "$BRANCH_DESC" | sed 's/-/ /g')"
-          NEW_ISSUE="$("$HOUSTON_DIR/scripts/linear-create-issue.sh" \
-            --title "$ISSUE_TITLE" \
-            --project "$PROJECT_ID" 2>/dev/null || echo "")"
-          TICKET_ID="$(echo "$NEW_ISSUE" | jq -r '.issue.identifier // empty' 2>/dev/null || echo "")"
+          NEW_ISSUE="$(linear_create_issue "$TEAM_ID" "$ISSUE_TITLE" "" "$PROJECT_ID" "" "" "" "" "$LINEAR_KEY_ENV" 2>/dev/null || echo "")"
+          TICKET_ID="$(echo "$NEW_ISSUE" | jq -r '.data.issueCreate.issue.identifier // empty' 2>/dev/null || echo "")"
           [[ -n "$TICKET_ID" ]] && echo "  Created ticket: $TICKET_ID" >&2
         fi
       fi
