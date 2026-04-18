@@ -24,6 +24,9 @@ orgs = []           # GitHub org names this profile covers
 [platforms.gitlab]
 orgs = []           # GitLab org/group names this profile covers
 
+[owners]
+users = []          # [agent profiles only] human git users this agent works under
+
 [reviewers.github]
 # "org/repo-pattern" = ["user1", "user2"]
 
@@ -34,9 +37,6 @@ orgs = []           # GitLab org/group names this profile covers
 # Per-org conventions enforced before PR/MR creation
 changelog = false       # Require CHANGELOG.md entry (keep a changelog format)
 lib_bump_check = false  # Check if shared libs changed, require version bump + note in MR
-
-[owners]
-users = []          # [agent profiles only] human git users this agent works under
 
 [detect]
 remote_patterns = [] # [required] Substrings to match in git remote URLs
