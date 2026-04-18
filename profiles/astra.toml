@@ -1,0 +1,25 @@
+# Astra — AI agent for Skyner / Nexion work
+[profile]
+name = "astra"
+priority = 1
+type = "agent"
+
+[identity]
+name = "Astra"
+email = "astra@skyner.co.za"
+git_user = "astra-skyner"
+
+[linear]
+api_key_env = "ASTRA_LINEAR_API_KEY"
+org = "Skyner Group"
+default_team = "Development"
+teams = ["Development"]
+
+[platforms.github]
+orgs = ["yashiels", "skynergroup"]
+
+[owners]
+users = ["yashiels", "mphocodes"]
+
+[detect]
+remote_patterns = []

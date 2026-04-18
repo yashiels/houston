@@ -68,11 +68,11 @@ parse_profile() {
   END {
     printf "{"
 
-    split("profile,identity,linear,platforms,reviewers,detect", top_sections, ",")
+    split("profile,identity,linear,platforms,owners,reviewers,detect", top_sections, ",")
 
     first_top = 1
 
-    for (ts = 1; ts <= 6; ts++) {
+    for (ts = 1; ts <= 7; ts++) {
       top = top_sections[ts]
 
       # Check if this top-level section has any data

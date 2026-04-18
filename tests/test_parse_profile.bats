@@ -77,3 +77,30 @@ setup() {
   run parse_profile "$REPO_ROOT/profiles/nonexistent.toml"
   [ "$status" -eq 1 ]
 }
+
+@test "parse apex profile returns valid JSON" {
+  run parse_profile "$REPO_ROOT/profiles/apex.toml"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq . >/dev/null 2>&1
+}
+
+@test "parse apex profile has type agent" {
+  run parse_profile "$REPO_ROOT/profiles/apex.toml"
+  [ "$status" -eq 0 ]
+  result="$(echo "$output" | jq -r '.profile.type')"
+  [ "$result" = "agent" ]
+}
+
+@test "parse apex profile has owners" {
+  run parse_profile "$REPO_ROOT/profiles/apex.toml"
+  [ "$status" -eq 0 ]
+  result="$(echo "$output" | jq -r '.owners.users[0]')"
+  [ "$result" = "yashiels" ]
+}
+
+@test "parse apex profile has correct linear org" {
+  run parse_profile "$REPO_ROOT/profiles/apex.toml"
+  [ "$status" -eq 0 ]
+  result="$(echo "$output" | jq -r '.linear.org')"
+  [ "$result" = "Skyner Group" ]
+}
