@@ -39,10 +39,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ -z "$TICKET_ID" ]]; then
-  echo "Usage: create-pr.sh <ticket-id> [--type feat|fix|chore] [--area area] [--title title] [--bullet1 text] [--bullet2 text]" >&2
-  exit 1
-fi
+# TICKET_ID may be derived from branch name below — defer the empty check
 
 # ─── Detect platform ───
 
@@ -83,6 +80,24 @@ if [[ -z "$DEFAULT_BRANCH" ]]; then
   done
 fi
 DEFAULT_BRANCH="${DEFAULT_BRANCH:-main}"
+
+# ─── Resolve ticket ID ───
+# Priority: CLI arg → branch name (PROJ-123 pattern) → error
+
+if [[ -z "$TICKET_ID" ]]; then
+  TICKET_ID="$(echo "$BRANCH" | grep -oiE '[A-Za-z]+-[0-9]+' | head -1 || echo "")"
+fi
+
+if [[ -z "$TICKET_ID" ]]; then
+  echo "ERROR: No Linear ticket ID found. Pass as first argument or name branch like PROJ-123/description" >&2
+  exit 1
+fi
+
+# Source linear.sh so downstream callers can use linear_attach_url etc.
+if [[ -f "$HOUSTON_DIR/pipeline/linear.sh" ]]; then
+  # shellcheck source=pipeline/linear.sh
+  source "$HOUSTON_DIR/pipeline/linear.sh" 2>/dev/null || true
+fi
 
 # ─── Build title and body from prd.json if available ───
 
@@ -271,15 +286,19 @@ PR_URL=""
 
 if [[ "$PLATFORM" == "github" ]]; then
   GH_ARGS=(pr create --title "$PR_TITLE" --body "$PR_BODY" --head "$BRANCH" --assignee "@me")
-  if [[ -n "$REVIEWERS" ]]; then
-    GH_ARGS+=(--reviewer "$REVIEWERS")
-  fi
 
   PR_URL="$(gh "${GH_ARGS[@]}" 2>&1)" || true
 
+  # Add reviewers separately — mixing into pr create corrupts PR_URL on reviewer errors
+  if [[ -n "$REVIEWERS" && "$PR_URL" == http* ]]; then
+    if ! gh pr edit "$PR_URL" --add-reviewer "$REVIEWERS" 2>/dev/null; then
+      echo "  WARNING: Could not add reviewers '$REVIEWERS' — may not be repo collaborators" >&2
+    fi
+  fi
+
   # Enable auto-merge only when no reviewers — with reviewers, branch protection gates the merge
   if [[ "$PR_URL" == http* && -z "$REVIEWERS" ]]; then
-    gh pr merge "$BRANCH" --auto --squash --delete-branch 2>/dev/null || true
+    gh pr merge "$BRANCH" --auto --squash --delete-branch --subject "$PR_TITLE" --body "" 2>/dev/null || true
     echo "  Auto-merge: enabled (squash + delete branch)"
   fi
 
@@ -306,7 +325,7 @@ elif [[ "$PLATFORM" == "gitlab" ]]; then
   if [[ "$PR_URL" == *"merge_requests"* ]]; then
     mr_number="$(echo "$PR_URL" | grep -oE '[0-9]+$' || echo "")"
     if [[ -n "$mr_number" ]]; then
-      glab mr merge "$mr_number" --auto-merge --squash --remove-source-branch --yes 2>/dev/null || true
+      glab mr merge "$mr_number" --auto-merge --squash --squash-message "$PR_TITLE" --remove-source-branch --yes 2>/dev/null || true
       echo "  Auto-merge: enabled (squash + delete branch)"
     fi
   fi
@@ -320,6 +339,11 @@ if [[ -n "$PR_URL" ]]; then
   if [[ -f "$RUN_DIR/state.json" ]]; then
     tmp=$(mktemp)
     jq --arg url "$PR_URL" '.pr_url = $url' "$RUN_DIR/state.json" > "$tmp" && mv "$tmp" "$RUN_DIR/state.json"
+  fi
+
+  # Attach PR/MR URL to Linear ticket if linear.sh was sourced
+  if declare -f linear_attach_url &>/dev/null; then
+    linear_attach_url "$TICKET_ID" "$PR_URL" "$PR_TITLE" 2>/dev/null || true
   fi
 else
   echo "WARNING: PR/MR creation may have failed. Check output above."

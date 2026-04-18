@@ -61,7 +61,7 @@ echo "Branch: $BRANCH" >&2
 
 # ─── Bot and praise filters ───
 
-BOT_PATTERNS="coderabbit|dependabot|renovate|github-actions|gitlab-bot|mergify|codecov|sonarqube|sonarcloud|snyk|greenkeeper|_bot_|exipay_bot"
+BOT_PATTERNS="coderabbit|dependabot|renovate|github-actions|gitlab-bot|mergify|codecov|sonarqube|sonarcloud|snyk|greenkeeper|linear|_bot_|exipay_bot"
 PRAISE_PATTERNS="^(lgtm|looks good|nice|great|awesome|ship it|:shipit:|:lgtm:|:thumbsup:|\\+1)[[:space:]!.]*$"
 
 is_bot() {

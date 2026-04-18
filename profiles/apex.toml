@@ -1,11 +1,11 @@
-# Apex — AI agent for Skyner / Nexion work
+# Apex device — Skyner Group personal repos
 [profile]
 name = "apex"
-priority = 1
+priority = 6
 type = "agent"
 
 [identity]
-name = "Apex"
+name = "Apex by Skyner"
 email = "apex@skyner.co.za"
 git_user = "apex-skyner"
 
@@ -15,11 +15,14 @@ org = "Skyner Group"
 default_team = "Development"
 teams = ["Development"]
 
+[owners]
+users = ["yashiels"]
+
 [platforms.github]
 orgs = ["yashiels", "skynergroup"]
 
-[owners]
-users = ["yashiels", "mphocodes"]
+[reviewers.github]
+"*" = ["mphocodes"]
 
 [detect]
 remote_patterns = []
