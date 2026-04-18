@@ -401,3 +401,353 @@ GRAPHQL
       })
   '
 }
+
+# ---------------------------------------------------------------------------
+# linear_api_with_vars <graphql-query> <variables-json> [api-key-env]
+# GraphQL request with variables object. Avoids string interpolation for
+# complex inputs (mutations with dynamic fields).
+# ---------------------------------------------------------------------------
+linear_api_with_vars() {
+  local query="$1"
+  local vars_json="$2"
+  local key_env="${3:-LINEAR_API_KEY}"
+  local api_key="${!key_env}"
+
+  if [ -z "$api_key" ]; then
+    echo '{"error":"No API key found in env var '"$key_env"'"}' >&2
+    return 1
+  fi
+
+  local payload
+  payload=$(jq -n --arg q "$query" --argjson v "$vars_json" \
+    '{"query": $q, "variables": $v}')
+
+  curl -s -X POST https://api.linear.app/graphql \
+    -H "Authorization: $api_key" \
+    -H "Content-Type: application/json" \
+    -d "$payload"
+}
+
+# ---------------------------------------------------------------------------
+# linear_list_teams [api-key-env]
+# List all teams in the workspace.
+# Returns JSON array of {id, name, key}.
+# ---------------------------------------------------------------------------
+linear_list_teams() {
+  local key_env="${1:-LINEAR_API_KEY}"
+  local resp
+  resp=$(linear_api '{ teams { nodes { id name key } } }' "$key_env") || return $?
+  echo "$resp" | jq '.data.teams.nodes // []'
+}
+
+# ---------------------------------------------------------------------------
+# linear_list_projects [team-id] [api-key-env]
+# List projects. Scoped to team if team-id provided, otherwise all projects.
+# Returns JSON array of {id, name, state, description, url}.
+# ---------------------------------------------------------------------------
+linear_list_projects() {
+  local team_id="${1:-}"
+  local key_env="${2:-LINEAR_API_KEY}"
+  local resp
+
+  if [[ -n "$team_id" ]]; then
+    resp=$(linear_api "{ team(id: \"$team_id\") { projects { nodes { id name state description url } } } }" \
+      "$key_env") || return $?
+    echo "$resp" | jq '.data.team.projects.nodes // []'
+  else
+    resp=$(linear_api '{ projects(first: 50) { nodes { id name state description url } } }' \
+      "$key_env") || return $?
+    echo "$resp" | jq '.data.projects.nodes // []'
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# linear_list_issues [team-id] [project-id] [state] [assignee-id] [limit] [api-key-env]
+# List issues with optional filters. Pass empty string to skip a filter.
+# Returns JSON array of {id, identifier, title, priority, state, assignee, project, labels, url}.
+# ---------------------------------------------------------------------------
+linear_list_issues() {
+  local team_id="${1:-}"
+  local project_id="${2:-}"
+  local state_filter="${3:-}"
+  local assignee_id="${4:-}"
+  local limit="${5:-50}"
+  local key_env="${6:-LINEAR_API_KEY}"
+
+  local filter="{}"
+  [[ -n "$team_id" ]]      && filter=$(echo "$filter" | jq --arg v "$team_id"      '. + {team:     {id:   {eq: $v}}}')
+  [[ -n "$project_id" ]]   && filter=$(echo "$filter" | jq --arg v "$project_id"   '. + {project:  {id:   {eq: $v}}}')
+  [[ -n "$state_filter" ]] && filter=$(echo "$filter" | jq --arg v "$state_filter" '. + {state:    {name: {eq: $v}}}')
+  [[ -n "$assignee_id" ]]  && filter=$(echo "$filter" | jq --arg v "$assignee_id"  '. + {assignee: {id:   {eq: $v}}}')
+
+  local query='query($filter: IssueFilter, $first: Int) {
+    issues(filter: $filter, first: $first) {
+      nodes {
+        id identifier title priority url
+        state { name }
+        assignee { name email }
+        project { id name }
+        labels { nodes { name } }
+      }
+    }
+  }'
+
+  local resp
+  resp=$(linear_api_with_vars "$query" \
+    "$(jq -n --argjson f "$filter" --argjson l "$limit" '{"filter": $f, "first": $l}')" \
+    "$key_env") || return $?
+  echo "$resp" | jq '.data.issues.nodes // []'
+}
+
+# ---------------------------------------------------------------------------
+# linear_resolve_team_id <name> [api-key-env]
+# Resolve team name to internal UUID. Outputs UUID on stdout.
+# ---------------------------------------------------------------------------
+linear_resolve_team_id() {
+  local name="$1"
+  local key_env="${2:-LINEAR_API_KEY}"
+
+  local team_id
+  team_id=$(linear_api '{ teams { nodes { id name } } }' "$key_env" | \
+    jq -r --arg n "$name" '.data.teams.nodes[] | select(.name == $n) | .id // empty')
+
+  if [[ -z "$team_id" ]]; then
+    echo '{"error":"Team not found: '"$name"'"}' >&2
+    return 1
+  fi
+  echo "$team_id"
+}
+
+# ---------------------------------------------------------------------------
+# linear_resolve_project_id <name> [team-id] [api-key-env]
+# Resolve project name to internal UUID. Outputs UUID on stdout.
+# ---------------------------------------------------------------------------
+linear_resolve_project_id() {
+  local name="$1"
+  local team_id="${2:-}"
+  local key_env="${3:-LINEAR_API_KEY}"
+
+  local project_id
+  if [[ -n "$team_id" ]]; then
+    project_id=$(linear_api "{ team(id: \"$team_id\") { projects { nodes { id name } } } }" \
+      "$key_env" | jq -r --arg n "$name" \
+      '.data.team.projects.nodes[] | select(.name == $n) | .id // empty')
+  else
+    project_id=$(linear_api '{ projects(first: 50) { nodes { id name } } }' "$key_env" | \
+      jq -r --arg n "$name" '.data.projects.nodes[] | select(.name == $n) | .id // empty')
+  fi
+
+  if [[ -z "$project_id" ]]; then
+    echo '{"error":"Project not found: '"$name"'"}' >&2
+    return 1
+  fi
+  echo "$project_id"
+}
+
+# ---------------------------------------------------------------------------
+# linear_resolve_member_id <name-or-email> [api-key-env]
+# Resolve a display name or email to a Linear user UUID. Outputs UUID on stdout.
+# ---------------------------------------------------------------------------
+linear_resolve_member_id() {
+  local name_or_email="$1"
+  local key_env="${2:-LINEAR_API_KEY}"
+
+  local member_id
+  member_id=$(linear_api '{ users { nodes { id name email } } }' "$key_env" | \
+    jq -r --arg q "$name_or_email" \
+    '[.data.users.nodes[] | select(.name == $q or .email == $q) | .id][0] // empty')
+
+  if [[ -z "$member_id" ]]; then
+    echo '{"error":"Member not found: '"$name_or_email"'"}' >&2
+    return 1
+  fi
+  echo "$member_id"
+}
+
+# ---------------------------------------------------------------------------
+# linear_resolve_label_ids <"Label1,Label2"> [team-id] [api-key-env]
+# Resolve comma-separated label names to a JSON array of UUIDs.
+# ---------------------------------------------------------------------------
+linear_resolve_label_ids() {
+  local label_names_csv="$1"
+  local team_id="${2:-}"
+  local key_env="${3:-LINEAR_API_KEY}"
+
+  local labels_json
+  if [[ -n "$team_id" ]]; then
+    labels_json=$(linear_api "{ team(id: \"$team_id\") { labels { nodes { id name } } } }" \
+      "$key_env" | jq '.data.team.labels.nodes // []')
+  else
+    labels_json=$(linear_api '{ issueLabels { nodes { id name } } }' \
+      "$key_env" | jq '.data.issueLabels.nodes // []')
+  fi
+
+  local ids="[]"
+  IFS=',' read -ra label_names <<< "$label_names_csv"
+  for label_name in "${label_names[@]}"; do
+    label_name="${label_name#"${label_name%%[! ]*}"}"
+    label_name="${label_name%"${label_name##*[! ]}"}"
+    local lid
+    lid=$(echo "$labels_json" | jq -r --arg n "$label_name" \
+      '.[] | select(.name == $n) | .id // empty')
+    [[ -n "$lid" ]] && ids=$(echo "$ids" | jq --arg id "$lid" '. + [$id]')
+  done
+
+  echo "$ids"
+}
+
+# ---------------------------------------------------------------------------
+# linear_create_issue <team-id> <title> [description] [project-id] [priority]
+#                     [assignee-id] [label-ids-json] [parent-identifier] [api-key-env]
+# Create a new issue. label-ids-json must be a JSON array string e.g. '["id1"]'.
+# parent-identifier is the human identifier e.g. "DEV-42" (resolved internally).
+# ---------------------------------------------------------------------------
+linear_create_issue() {
+  local team_id="$1"
+  local title="$2"
+  local description="${3:-}"
+  local project_id="${4:-}"
+  local priority="${5:-}"
+  local assignee_id="${6:-}"
+  local label_ids="${7:-}"
+  local parent_identifier="${8:-}"
+  local key_env="${9:-LINEAR_API_KEY}"
+
+  local input="{}"
+  input=$(echo "$input" | jq --arg v "$team_id" '. + {teamId: $v}')
+  input=$(echo "$input" | jq --arg v "$title"   '. + {title: $v}')
+  [[ -n "$description" ]] && input=$(echo "$input" | jq --arg v "$description" '. + {description: $v}')
+  [[ -n "$project_id" ]]  && input=$(echo "$input" | jq --arg v "$project_id"  '. + {projectId: $v}')
+  [[ -n "$priority" ]]    && input=$(echo "$input" | jq --argjson v "$priority" '. + {priority: $v}')
+  [[ -n "$assignee_id" ]] && input=$(echo "$input" | jq --arg v "$assignee_id" '. + {assigneeId: $v}')
+  if [[ -n "$label_ids" && "$label_ids" != "[]" ]]; then
+    input=$(echo "$input" | jq --argjson v "$label_ids" '. + {labelIds: $v}')
+  fi
+
+  if [[ -n "$parent_identifier" ]]; then
+    local parent_uuid
+    parent_uuid=$(linear_api "{ issue(id: \"$parent_identifier\") { id } }" "$key_env" | \
+      jq -r '.data.issue.id // empty')
+    if [[ -z "$parent_uuid" ]]; then
+      echo '{"error":"Parent issue not found: '"$parent_identifier"'"}' >&2
+      return 1
+    fi
+    input=$(echo "$input" | jq --arg v "$parent_uuid" '. + {parentId: $v}')
+  fi
+
+  local query='mutation($input: IssueCreateInput!) {
+    issueCreate(input: $input) {
+      success
+      issue { id identifier title url }
+    }
+  }'
+
+  linear_api_with_vars "$query" \
+    "$(jq -n --argjson inp "$input" '{"input": $inp}')" \
+    "$key_env"
+}
+
+# ---------------------------------------------------------------------------
+# linear_update_issue <identifier> [title] [description] [project-id] [priority]
+#                     [assignee-id] [label-ids-json] [parent-uuid] [api-key-env]
+# Update an issue. Pass empty string to skip a field. identifier is e.g. "DEV-42".
+# ---------------------------------------------------------------------------
+linear_update_issue() {
+  local identifier="$1"
+  local title="${2:-}"
+  local description="${3:-}"
+  local project_id="${4:-}"
+  local priority="${5:-}"
+  local assignee_id="${6:-}"
+  local label_ids="${7:-}"
+  local parent_id="${8:-}"
+  local key_env="${9:-LINEAR_API_KEY}"
+
+  local issue_uuid
+  issue_uuid=$(linear_api "{ issue(id: \"$identifier\") { id } }" "$key_env" | \
+    jq -r '.data.issue.id // empty')
+
+  if [[ -z "$issue_uuid" ]]; then
+    echo '{"error":"Issue not found","identifier":"'"$identifier"'"}' >&2
+    return 1
+  fi
+
+  local input="{}"
+  [[ -n "$title" ]]       && input=$(echo "$input" | jq --arg v "$title"       '. + {title: $v}')
+  [[ -n "$description" ]] && input=$(echo "$input" | jq --arg v "$description" '. + {description: $v}')
+  [[ -n "$project_id" ]]  && input=$(echo "$input" | jq --arg v "$project_id"  '. + {projectId: $v}')
+  [[ -n "$priority" ]]    && input=$(echo "$input" | jq --argjson v "$priority" '. + {priority: $v}')
+  [[ -n "$assignee_id" ]] && input=$(echo "$input" | jq --arg v "$assignee_id" '. + {assigneeId: $v}')
+  if [[ -n "$label_ids" && "$label_ids" != "[]" ]]; then
+    input=$(echo "$input" | jq --argjson v "$label_ids" '. + {labelIds: $v}')
+  fi
+  [[ -n "$parent_id" ]] && input=$(echo "$input" | jq --arg v "$parent_id" '. + {parentId: $v}')
+
+  local query='mutation($id: String!, $input: IssueUpdateInput!) {
+    issueUpdate(id: $id, input: $input) {
+      success
+      issue { id identifier title url }
+    }
+  }'
+
+  linear_api_with_vars "$query" \
+    "$(jq -n --arg id "$issue_uuid" --argjson inp "$input" '{"id": $id, "input": $inp}')" \
+    "$key_env"
+}
+
+# ---------------------------------------------------------------------------
+# linear_create_project <team-id> <name> [description] [state] [api-key-env]
+# state: backlog|planned|started|paused|completed|cancelled (default: backlog)
+# ---------------------------------------------------------------------------
+linear_create_project() {
+  local team_id="$1"
+  local name="$2"
+  local description="${3:-}"
+  local state="${4:-backlog}"
+  local key_env="${5:-LINEAR_API_KEY}"
+
+  local input="{}"
+  input=$(echo "$input" | jq --arg v "$team_id" '. + {teamIds: [$v]}')
+  input=$(echo "$input" | jq --arg v "$name"    '. + {name: $v}')
+  input=$(echo "$input" | jq --arg v "$state"   '. + {state: $v}')
+  [[ -n "$description" ]] && input=$(echo "$input" | jq --arg v "$description" '. + {description: $v}')
+
+  local query='mutation($input: ProjectCreateInput!) {
+    projectCreate(input: $input) {
+      success
+      project { id name state url }
+    }
+  }'
+
+  linear_api_with_vars "$query" \
+    "$(jq -n --argjson inp "$input" '{"input": $inp}')" \
+    "$key_env"
+}
+
+# ---------------------------------------------------------------------------
+# linear_update_project <project-id> [name] [description] [state] [api-key-env]
+# project-id must be the internal UUID.
+# ---------------------------------------------------------------------------
+linear_update_project() {
+  local project_id="$1"
+  local name="${2:-}"
+  local description="${3:-}"
+  local state="${4:-}"
+  local key_env="${5:-LINEAR_API_KEY}"
+
+  local input="{}"
+  [[ -n "$name" ]]        && input=$(echo "$input" | jq --arg v "$name"        '. + {name: $v}')
+  [[ -n "$description" ]] && input=$(echo "$input" | jq --arg v "$description" '. + {description: $v}')
+  [[ -n "$state" ]]       && input=$(echo "$input" | jq --arg v "$state"       '. + {state: $v}')
+
+  local query='mutation($id: String!, $input: ProjectUpdateInput!) {
+    projectUpdate(id: $id, input: $input) {
+      success
+      project { id name state url }
+    }
+  }'
+
+  linear_api_with_vars "$query" \
+    "$(jq -n --arg id "$project_id" --argjson inp "$input" '{"id": $id, "input": $inp}')" \
+    "$key_env"
+}

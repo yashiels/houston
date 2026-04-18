@@ -5,6 +5,7 @@
 [profile]
 name = ""           # [required] Unique profile identifier
 priority = 0        # [required] Higher wins on ambiguous detection
+type = ""           # [optional] "agent" or "human" — omit for human profiles
 
 [identity]
 name = ""           # [required] Git author name
@@ -22,6 +23,9 @@ orgs = []           # GitHub org names this profile covers
 
 [platforms.gitlab]
 orgs = []           # GitLab org/group names this profile covers
+
+[owners]
+users = []          # [agent profiles only] human git users this agent works under
 
 [reviewers.github]
 # "org/repo-pattern" = ["user1", "user2"]
