@@ -492,9 +492,11 @@ linear_list_issues() {
     }
   }'
 
-  linear_api_with_vars "$query" \
+  local resp
+  resp=$(linear_api_with_vars "$query" \
     "$(jq -n --argjson f "$filter" --argjson l "$limit" '{"filter": $f, "first": $l}')" \
-    "$key_env" | jq '.data.issues.nodes // []'
+    "$key_env") || return $?
+  echo "$resp" | jq '.data.issues.nodes // []'
 }
 
 # ---------------------------------------------------------------------------
@@ -626,7 +628,11 @@ linear_create_issue() {
     local parent_uuid
     parent_uuid=$(linear_api "{ issue(id: \"$parent_identifier\") { id } }" "$key_env" | \
       jq -r '.data.issue.id // empty')
-    [[ -n "$parent_uuid" ]] && input=$(echo "$input" | jq --arg v "$parent_uuid" '. + {parentId: $v}')
+    if [[ -z "$parent_uuid" ]]; then
+      echo '{"error":"Parent issue not found: '"$parent_identifier"'"}' >&2
+      return 1
+    fi
+    input=$(echo "$input" | jq --arg v "$parent_uuid" '. + {parentId: $v}')
   fi
 
   local query='mutation($input: IssueCreateInput!) {

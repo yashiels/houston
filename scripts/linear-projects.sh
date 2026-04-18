@@ -15,8 +15,8 @@ PROFILE_OVERRIDE=""
 TEAM_NAME=""
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --profile) PROFILE_OVERRIDE="$2"; shift ;;
-    --team)    TEAM_NAME="$2"; shift ;;
+    --profile) PROFILE_OVERRIDE="${2:-}"; shift ;;
+    --team)    TEAM_NAME="${2:-}"; shift ;;
     -h|--help) echo "Usage: linear-projects.sh [--team TEAM_NAME] [--profile NAME]" >&2; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac

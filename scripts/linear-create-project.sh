@@ -22,11 +22,11 @@ STATE="backlog"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --profile)     PROFILE_OVERRIDE="$2"; shift ;;
-    --team)        TEAM_NAME="$2"; shift ;;
-    --name)        NAME="$2"; shift ;;
-    --description) DESCRIPTION="$2"; shift ;;
-    --state)       STATE="$2"; shift ;;
+    --profile)     PROFILE_OVERRIDE="${2:-}"; shift ;;
+    --team)        TEAM_NAME="${2:-}"; shift ;;
+    --name)        NAME="${2:-}"; shift ;;
+    --description) DESCRIPTION="${2:-}"; shift ;;
+    --state)       STATE="${2:-}"; shift ;;
     -h|--help)
       echo "Usage: linear-create-project.sh --name NAME [--team NAME] [--description DESC] [--state STATE] [--profile NAME]" >&2
       exit 0 ;;

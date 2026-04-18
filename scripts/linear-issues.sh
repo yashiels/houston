@@ -21,12 +21,12 @@ LIMIT="50"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --profile)  PROFILE_OVERRIDE="$2"; shift ;;
-    --team)     TEAM_NAME="$2"; shift ;;
-    --project)  PROJECT_ARG="$2"; shift ;;
-    --state)    STATE_FILTER="$2"; shift ;;
-    --assignee) ASSIGNEE="$2"; shift ;;
-    --limit)    LIMIT="$2"; shift ;;
+    --profile)  PROFILE_OVERRIDE="${2:-}"; shift ;;
+    --team)     TEAM_NAME="${2:-}"; shift ;;
+    --project)  PROJECT_ARG="${2:-}"; shift ;;
+    --state)    STATE_FILTER="${2:-}"; shift ;;
+    --assignee) ASSIGNEE="${2:-}"; shift ;;
+    --limit)    LIMIT="${2:-}"; shift ;;
     -h|--help)
       echo "Usage: linear-issues.sh [--project NAME_OR_UUID] [--team NAME] [--state STATE] [--assignee NAME_OR_EMAIL] [--limit N] [--profile NAME]" >&2
       exit 0 ;;

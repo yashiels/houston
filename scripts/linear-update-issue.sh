@@ -28,14 +28,14 @@ PARENT=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --profile)     PROFILE_OVERRIDE="$2"; shift ;;
-    --title)       TITLE="$2"; shift ;;
-    --description) DESCRIPTION="$2"; shift ;;
-    --project)     PROJECT_NAME="$2"; shift ;;
-    --priority)    PRIORITY="$2"; shift ;;
-    --assignee)    ASSIGNEE="$2"; shift ;;
-    --labels)      LABELS="$2"; shift ;;
-    --parent)      PARENT="$2"; shift ;;
+    --profile)     PROFILE_OVERRIDE="${2:-}"; shift ;;
+    --title)       TITLE="${2:-}"; shift ;;
+    --description) DESCRIPTION="${2:-}"; shift ;;
+    --project)     PROJECT_NAME="${2:-}"; shift ;;
+    --priority)    PRIORITY="${2:-}"; shift ;;
+    --assignee)    ASSIGNEE="${2:-}"; shift ;;
+    --labels)      LABELS="${2:-}"; shift ;;
+    --parent)      PARENT="${2:-}"; shift ;;
     -h|--help)
       echo "Usage: linear-update-issue.sh <ISSUE-ID> [--title TITLE] [--description DESC] [--project NAME] [--priority 0-4] [--assignee NAME_OR_EMAIL] [--labels L1,L2] [--parent ISSUE-ID] [--profile NAME]" >&2
       exit 0 ;;
@@ -47,6 +47,11 @@ done
 
 if [[ -z "$ISSUE_ID" ]]; then
   echo "Usage: linear-update-issue.sh <ISSUE-ID> [options]" >&2
+  exit 1
+fi
+
+if [[ ! "$ISSUE_ID" =~ ^[A-Z]+-[0-9]+$ ]]; then
+  echo '{"error":"Invalid issue identifier format. Expected e.g. DEV-42"}' >&2
   exit 1
 fi
 

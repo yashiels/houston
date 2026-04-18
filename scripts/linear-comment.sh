@@ -17,8 +17,8 @@ PROFILE_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --profile) PROFILE_OVERRIDE="$2"; shift ;;
-    --body)    BODY="$2"; shift ;;
+    --profile) PROFILE_OVERRIDE="${2:-}"; shift ;;
+    --body)    BODY="${2:-}"; shift ;;
     -h|--help) echo "Usage: linear-comment.sh <ISSUE-ID> --body TEXT [--profile NAME]" >&2; exit 0 ;;
     -*) echo "Unknown option: $1" >&2; exit 1 ;;
     *)  ISSUE_ID="$1" ;;
@@ -28,6 +28,11 @@ done
 
 if [[ -z "$ISSUE_ID" ]]; then
   echo "Usage: linear-comment.sh <ISSUE-ID> --body TEXT [--profile NAME]" >&2
+  exit 1
+fi
+
+if [[ ! "$ISSUE_ID" =~ ^[A-Z]+-[0-9]+$ ]]; then
+  echo '{"error":"Invalid issue identifier format. Expected e.g. DEV-42"}' >&2
   exit 1
 fi
 
