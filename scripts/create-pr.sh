@@ -298,7 +298,7 @@ if [[ "$PLATFORM" == "github" ]]; then
 
   # Enable auto-merge only when no reviewers — with reviewers, branch protection gates the merge
   if [[ "$PR_URL" == http* && -z "$REVIEWERS" ]]; then
-    gh pr merge "$BRANCH" --auto --squash --delete-branch 2>/dev/null || true
+    gh pr merge "$BRANCH" --auto --squash --delete-branch --subject "$PR_TITLE" --body "" 2>/dev/null || true
     echo "  Auto-merge: enabled (squash + delete branch)"
   fi
 
@@ -325,7 +325,7 @@ elif [[ "$PLATFORM" == "gitlab" ]]; then
   if [[ "$PR_URL" == *"merge_requests"* ]]; then
     mr_number="$(echo "$PR_URL" | grep -oE '[0-9]+$' || echo "")"
     if [[ -n "$mr_number" ]]; then
-      glab mr merge "$mr_number" --auto-merge --squash --remove-source-branch --yes 2>/dev/null || true
+      glab mr merge "$mr_number" --auto-merge --squash --squash-message "$PR_TITLE" --remove-source-branch --yes 2>/dev/null || true
       echo "  Auto-merge: enabled (squash + delete branch)"
     fi
   fi
