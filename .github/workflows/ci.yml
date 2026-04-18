@@ -11,7 +11,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install ShellCheck
         run: sudo apt-get install -y shellcheck
@@ -28,7 +28,7 @@ jobs:
     name: Bash Syntax Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Verify all scripts parse
         run: |
@@ -42,7 +42,7 @@ jobs:
     name: Bats Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install bats
         run: sudo apt-get install -y bats
@@ -57,7 +57,7 @@ jobs:
     name: Validate JSON
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate anti-patterns.json
         run: jq empty rules/anti-patterns.json
@@ -75,7 +75,7 @@ jobs:
     name: Validate Profiles
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check profiles parse correctly
         run: |
