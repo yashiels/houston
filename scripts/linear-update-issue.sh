@@ -67,5 +67,16 @@ if [[ -n "$LABELS" ]]; then
   LABEL_IDS=$(linear_resolve_label_ids "$LABELS" "${TEAM_ID:-}" "$LINEAR_KEY_ENV")
 fi
 
+# Resolve --parent identifier (e.g. DEV-42) to internal UUID for the mutation
+PARENT_UUID=""
+if [[ -n "$PARENT" ]]; then
+  PARENT_UUID=$(linear_api "{ issue(id: \"$PARENT\") { id } }" "$LINEAR_KEY_ENV" | \
+    jq -r '.data.issue.id // empty')
+  if [[ -z "$PARENT_UUID" ]]; then
+    echo '{"error":"Parent issue not found: '"$PARENT"'"}' >&2
+    exit 1
+  fi
+fi
+
 linear_update_issue "$ISSUE_ID" "$TITLE" "$DESCRIPTION" "$PROJECT_ID" \
-  "$PRIORITY" "$ASSIGNEE_ID" "$LABEL_IDS" "$PARENT" "$LINEAR_KEY_ENV"
+  "$PRIORITY" "$ASSIGNEE_ID" "$LABEL_IDS" "$PARENT_UUID" "$LINEAR_KEY_ENV"
