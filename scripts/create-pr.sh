@@ -271,11 +271,15 @@ PR_URL=""
 
 if [[ "$PLATFORM" == "github" ]]; then
   GH_ARGS=(pr create --title "$PR_TITLE" --body "$PR_BODY" --head "$BRANCH" --assignee "@me")
-  if [[ -n "$REVIEWERS" ]]; then
-    GH_ARGS+=(--reviewer "$REVIEWERS")
-  fi
 
   PR_URL="$(gh "${GH_ARGS[@]}" 2>&1)" || true
+
+  # Add reviewers separately — mixing into pr create corrupts PR_URL on reviewer errors
+  if [[ -n "$REVIEWERS" && "$PR_URL" == http* ]]; then
+    if ! gh pr edit "$PR_URL" --add-reviewer "$REVIEWERS" 2>/dev/null; then
+      echo "  WARNING: Could not add reviewers '$REVIEWERS' — may not be repo collaborators" >&2
+    fi
+  fi
 
   # Enable auto-merge only when no reviewers — with reviewers, branch protection gates the merge
   if [[ "$PR_URL" == http* && -z "$REVIEWERS" ]]; then
