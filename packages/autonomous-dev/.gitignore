@@ -1,0 +1,19 @@
+.autonomous-dev/
+.pipeline/
+.ac/
+*.log
+.env
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+.qdrant-index-state.json
+indexer/.venv/
+.worktrees/
+.DS_Store
+
+# autonomous-dev (ephemeral pipeline state)
+prd.json
+research/
+progress.txt
+plan-grill-report.md

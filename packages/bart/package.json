@@ -1,0 +1,21 @@
+{
+  "name": "bart",
+  "version": "1.0.0",
+  "description": "Autonomous development loop - PRD to production-ready code with TDD, multi-agent orchestration, and code-enforced quality gates",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "bart": "./bin/bart.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "bart": "node bin/bart.js"
+  },
+  "keywords": ["ai", "autonomous", "development", "claude", "prd", "tdd"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "picocolors": "^1.1.1"
+  }
+}

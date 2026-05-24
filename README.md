@@ -181,6 +181,15 @@ houston/
 └── tests/             Bats test suite (47 tests)
 ```
 
+## Consolidated Packages
+
+This monorepo also includes the following autonomous development tools under `packages/`:
+
+| Package | Origin | Description |
+|---------|--------|-------------|
+| [`packages/autonomous-dev`](packages/autonomous-dev) | [skynergroup/autonomous-dev](https://github.com/skynergroup/autonomous-dev) | PRD-to-PR autonomous development tool (Shell + Python) |
+| [`packages/bart`](packages/bart) | [yashiels/bart](https://github.com/yashiels/bart) (fork of [moltpill/bart](https://github.com/moltpill/bart)) | Autonomous development loop (Shell + Python) |
+
 ## State
 
 All runtime state lives in `~/.houston/runs/<ticket-id>/` — never in the target repo.

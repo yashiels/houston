@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: [self-hosted, Linux, X64, astra]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+      - name: Run ShellCheck on all .sh files
+        run: |
+          find . -name '*.sh' -type f | xargs shellcheck --severity=warning
+
+  validate-json:
+    name: Validate JSON
+    runs-on: [self-hosted, Linux, X64, astra]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON files
+        run: |
+          for f in rules/anti-patterns.json hooks/.claude/settings.json; do
+            if [ -f "$f" ]; then
+              echo "Validating $f..."
+              python3 -m json.tool "$f" > /dev/null
+            else
+              echo "Skipping $f (not found)"
+            fi
+          done
+
+  python-lint:
+    name: Python Lint
+    runs-on: [self-hosted, Linux, X64, astra]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Lint indexer/
+        run: |
+          if [ -d "indexer" ]; then
+            ruff check indexer/
+          else
+            echo "No indexer/ directory found, skipping"
+          fi

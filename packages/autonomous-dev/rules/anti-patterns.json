@@ -1,0 +1,38 @@
+[
+  {
+    "pattern": "console\\.log",
+    "message": "Use project logger instead of console.log",
+    "severity": "warning",
+    "exclude": ["*.test.ts", "*.spec.ts", "*.test.tsx"]
+  },
+  {
+    "pattern": ": any[^_]",
+    "message": "Use proper types instead of 'any'",
+    "severity": "warning",
+    "exclude": []
+  },
+  {
+    "pattern": "--no-verify",
+    "message": "Never skip git hooks",
+    "severity": "error",
+    "exclude": []
+  },
+  {
+    "pattern": "\\.skip\\(|xdescribe\\(|xit\\(",
+    "message": "Remove skipped tests before committing",
+    "severity": "error",
+    "exclude": []
+  },
+  {
+    "pattern": "\\.only\\(",
+    "message": "Remove .only() — it disables other tests",
+    "severity": "error",
+    "exclude": []
+  },
+  {
+    "pattern": "@ts-ignore|@ts-expect-error",
+    "message": "Fix the type error instead of suppressing it",
+    "severity": "warning",
+    "exclude": []
+  }
+]
